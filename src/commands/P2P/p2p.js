@@ -143,13 +143,14 @@ export default {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'deal') {
-            const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+            // Public non-ephemeral defer so the deal proof is a permanent public channel message
+            const deferred = await InteractionHelper.safeDefer(interaction, {});
             if (!deferred) return;
             return await handleDeal(interaction);
         }
 
         if (subcommand === 'autolog') {
-            const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+            const deferred = await InteractionHelper.safeDefer(interaction, {});
             if (!deferred) return;
             return await handleAutoLog(interaction);
         }
@@ -211,25 +212,29 @@ async function handleAutoLog(interaction) {
     const dealEmbed = buildDealEmbed(dealRecord, config);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
-    const sentMsg = await targetChannel.send({
-        embeds: [dealEmbed],
-        components: [componentsRow]
-    });
+    if (targetChannel && targetChannel.id !== interaction.channel.id) {
+        const sentMsg = await targetChannel.send({
+            embeds: [dealEmbed],
+            components: [componentsRow]
+        });
+        dealRecord.messageId = sentMsg.id;
+        dealRecord.channelId = targetChannel.id;
 
-    dealRecord.messageId = sentMsg.id;
-    dealRecord.channelId = targetChannel.id;
-
-    return await InteractionHelper.safeEditReply(interaction, {
-        embeds: [
-            successEmbed(
-                'Auto-Log Successful!',
-                `Auto-scanned ticket channel and published deal proof to <#${targetChannel.id}>!\n\n` +
-                `• **Parties:** <@${buyerId}> ↔️ <@${sellerId}>\n` +
-                `• **Amount:** ${detected.usdtAmount} USDT ($${detected.usdAmount})\n` +
-                `• **Tx Hash:** \`${detected.txHash || 'Auto-Detected'}\``
-            )
-        ]
-    });
+        return await InteractionHelper.safeEditReply(interaction, {
+            embeds: [
+                successEmbed(
+                    'Auto-Log Successful!',
+                    `Auto-scanned ticket channel and published permanent deal proof to <#${targetChannel.id}>!`
+                )
+            ]
+        });
+    } else {
+        // Direct public response in same channel - 100% permanent, no dismiss button
+        return await InteractionHelper.safeEditReply(interaction, {
+            embeds: [dealEmbed],
+            components: [componentsRow]
+        });
+    }
 }
 
 /**
@@ -345,35 +350,38 @@ async function handleDeal(interaction) {
     const dealEmbed = buildDealEmbed(dealRecord, config);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
-    let sentMsg;
-    try {
-        sentMsg = await targetChannel.send({
+    if (targetChannel.id !== interaction.channel.id) {
+        let sentMsg;
+        try {
+            sentMsg = await targetChannel.send({
+                embeds: [dealEmbed],
+                components: [componentsRow]
+            });
+            dealRecord.messageId = sentMsg.id;
+            dealRecord.channelId = targetChannel.id;
+        } catch (err) {
+            logger.error('Failed to post P2P deal embed to target channel', { error: err.message, channelId: targetChannel.id });
+            return await replyUserError(interaction, {
+                type: ErrorTypes.DISCORD_API,
+                message: `Failed to post the transaction embed in <#${targetChannel.id}>. Make sure the bot has permission to Send Messages and Embed Links.`
+            });
+        }
+
+        return await InteractionHelper.safeEditReply(interaction, {
+            embeds: [
+                successEmbed(
+                    'Transaction Proof Published!',
+                    `The permanent transaction proof embed has been posted in <#${targetChannel.id}>.`
+                )
+            ]
+        });
+    } else {
+        // Direct public interaction reply - 100% permanent, no dismiss button, no cross icon
+        return await InteractionHelper.safeEditReply(interaction, {
             embeds: [dealEmbed],
             components: [componentsRow]
         });
-
-        dealRecord.messageId = sentMsg.id;
-        dealRecord.channelId = targetChannel.id;
-    } catch (err) {
-        logger.error('Failed to post P2P deal embed to target channel', { error: err.message, channelId: targetChannel.id });
-        return await replyUserError(interaction, {
-            type: ErrorTypes.DISCORD_API,
-            message: `Failed to post the transaction embed in <#${targetChannel.id}>. Make sure the bot has permission to Send Messages and Embed Links.`
-        });
     }
-
-    return await InteractionHelper.safeEditReply(interaction, {
-        embeds: [
-            successEmbed(
-                'Transaction Proof Published!',
-                `The permanent transaction proof embed has been posted in <#${targetChannel.id}>.\n\n` +
-                `• **Deal ID:** \`${dealRecord.dealId}\`\n` +
-                `• **Parties:** ${buyer} ↔️ ${seller}\n` +
-                `• **Amount:** $${usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD / ${usdtAmount} USDT\n` +
-                `• **Status:** \`${status}\``
-            )
-        ]
-    });
 }
 
 /**
