@@ -89,6 +89,7 @@ async function runEndToEndVerification() {
         id: 'mock_interaction_12345',
         createdTimestamp: Date.now(),
         guildId: mockGuildId,
+        channel: { id: 'channel_ticket_123' },
         user: { id: 'admin_middleman_007', username: 'MiddlemanAdmin' },
         member: {
             permissions: { has: () => true },

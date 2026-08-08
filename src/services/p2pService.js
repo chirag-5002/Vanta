@@ -6,8 +6,9 @@ export const DEFAULT_P2P_CONFIG = {
     dealChannelId: null,
     vouchChannelId: null,
     staffRoleId: null,
+    priceChannelId: null,
     titleText: 'Successful Transaction',
-    footerText: 'Auto-MM Successful Deal',
+    footerText: 'Vanta Verified Successful Deal',
     embedColor: '#FFC107', // Amber/Yellow matching reference design
 };
 
@@ -68,19 +69,16 @@ export async function autoDetectDealFromChannel(channel, guildId) {
     let dealInfo = null;
 
     try {
-        // 1. Detect Buyer from Ticket Database Data
         const ticketData = await getTicketData(guildId, channel.id);
         if (ticketData?.userId) {
             buyerId = ticketData.userId;
         }
 
-        // 2. Fetch last 50 messages from channel to auto-extract trade details
         const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
 
         if (messages && messages.size > 0) {
             const msgArray = Array.from(messages.values()).reverse();
 
-            // Find human members in channel
             const humanMentionIds = new Set();
             for (const msg of msgArray) {
                 if (!msg.author.bot) {
@@ -99,7 +97,6 @@ export async function autoDetectDealFromChannel(channel, guildId) {
                 sellerId = humanList.find(id => id !== buyerId) || humanList[1];
             }
 
-            // Regex patterns for Tx Hash, Amount, and Info
             const txRegex = /(0x[a-fA-F0-9]{40,66})|(https?:\/\/(bscscan|etherscan|tronscan|solscan)[^\s]+)/i;
             const amountRegex = /(\b\d+(\.\d+)?\b)\s*(usdt|usd|\$)/i;
             const altAmountRegex = /(amount|total|price|paid|sent)[:\s]*\$?(\d+(\.\d+)?)/i;
@@ -109,7 +106,6 @@ export async function autoDetectDealFromChannel(channel, guildId) {
 
                 const text = msg.content || '';
 
-                // Extract Tx Hash
                 if (!txHash) {
                     const txMatch = text.match(txRegex);
                     if (txMatch) {
@@ -117,7 +113,6 @@ export async function autoDetectDealFromChannel(channel, guildId) {
                     }
                 }
 
-                // Extract USDT Amount
                 if (!usdtAmount) {
                     const amtMatch = text.match(amountRegex) || text.match(altAmountRegex);
                     if (amtMatch) {
@@ -128,7 +123,6 @@ export async function autoDetectDealFromChannel(channel, guildId) {
                     }
                 }
 
-                // Extract Deal Info
                 if (!dealInfo && (text.toLowerCase().includes('wallet') || text.toLowerCase().includes('inr') || text.toLowerCase().includes('binance') || text.toLowerCase().includes('p2p') || text.toLowerCase().includes('bank'))) {
                     dealInfo = text.substring(0, 80).replace(/\n/g, ' ');
                 }
@@ -181,7 +175,7 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
         hour12: true
     });
 
-    const footerText = `${config.footerText || 'Auto-MM Successful Deal'} | ${timestampText}`;
+    const footerText = `${config.footerText || 'Vanta Verified Successful Deal'} | ${timestampText}`;
 
     const embed = new EmbedBuilder()
         .setTitle(title)
@@ -219,11 +213,73 @@ export function buildDealComponents(vouchChannelId, dealId) {
 }
 
 /**
+ * Builds the Ultra-Professional USDT Market Price Update Embed matching reference design.
+ */
+export function buildPriceUpdateEmbed(priceData, guildName = 'Vanta Network') {
+    const symbol = priceData.symbol || '₹';
+    const buyNum = parseFloat(priceData.buyPrice) || 0;
+    const sellNum = parseFloat(priceData.sellPrice) || 0;
+
+    const formattedBuy = `${symbol} ${buyNum.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}`;
+    const formattedSell = `${symbol} ${sellNum.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}`;
+    
+    const spread = (buyNum - sellNum).toFixed(2);
+
+    const description = [
+        `**${guildName}** has updated the real-time P2P exchange rates.\n`,
+        `> **🟢 BUY PRICE** \`\`\`${formattedBuy}\`\`\``,
+        `> **🔴 SELL PRICE** \`\`\`${formattedSell}\`\`\``
+    ].join('\n');
+
+    const paymentMethods = priceData.paymentMethods || 'UPI • IMPS • Paytm • GPay • Bank Transfer';
+
+    const embed = new EmbedBuilder()
+        .setTitle('📈 USDT Market Price Update')
+        .setDescription(description)
+        .setColor('#FFC107')
+        .addFields(
+            { name: '💳 Payment Methods', value: `\`${paymentMethods}\``, inline: true },
+            { name: '📊 Market Spread', value: `\`${symbol} ${spread}\``, inline: true }
+        );
+
+    const now = new Date();
+    const timestampStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    embed.setFooter({ text: `${guildName} - Market Sync • Today at ${timestampStr}` });
+
+    return embed;
+}
+
+/**
+ * Builds the action row buttons for price updates.
+ */
+export function buildPriceComponents(vouchChannelId) {
+    const row = new ActionRowBuilder();
+
+    row.addComponents(
+        new ButtonBuilder()
+            .setCustomId('p2p_price_buy')
+            .setLabel('🟢 Buy USDT')
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId('p2p_price_sell')
+            .setLabel('🔴 Sell USDT')
+            .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+            .setCustomId(`p2p_goto_vouch:${vouchChannelId || 'default'}`)
+            .setLabel('⭐ View Vouches')
+            .setStyle(ButtonStyle.Secondary)
+    );
+
+    return row;
+}
+
+/**
  * Logs a new P2P deal in database and updates stats.
  */
 export async function logDeal(guildId, dealData) {
     const dealsKey = getP2PDealsKey(guildId);
-    const deals = await getFromDb(dealsKey, []);
+    const rawDeals = await getFromDb(dealsKey, []);
+    const deals = Array.isArray(rawDeals) ? rawDeals : [];
 
     const dealId = `DEAL-${Date.now().toString(36).toUpperCase()}`;
     const timestamp = new Date().toISOString();
@@ -301,7 +357,8 @@ export async function getUserP2PStats(guildId, userId) {
  */
 export async function getGuildP2PStats(guildId) {
     const dealsKey = getP2PDealsKey(guildId);
-    const deals = await getFromDb(dealsKey, []);
+    const rawDeals = await getFromDb(dealsKey, []);
+    const deals = Array.isArray(rawDeals) ? rawDeals : [];
     
     const completed = deals.filter(d => d.status === 'Completed');
     const totalVolume = completed.reduce((acc, d) => acc + (parseFloat(d.usdtAmount) || 0), 0);

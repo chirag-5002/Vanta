@@ -19,7 +19,7 @@ const mockDeal = {
 const mockConfig = {
     ...DEFAULT_P2P_CONFIG,
     vouchChannelId: '123456789012345678',
-    footerText: 'Auto-MM Successful Deal'
+    footerText: 'Vanta Verified Successful Deal'
 };
 
 const embed = buildDealEmbed(mockDeal, mockConfig);

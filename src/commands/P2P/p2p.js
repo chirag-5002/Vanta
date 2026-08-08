@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } from 'discord.js';
-import { getP2PConfig, saveP2PConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel } from '../../services/p2pService.js';
+import { getP2PConfig, saveP2PConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents } from '../../services/p2pService.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -8,8 +8,58 @@ import { logger } from '../../utils/logger.js';
 export default {
     data: new SlashCommandBuilder()
         .setName('p2p')
-        .setDescription('P2P USDT transaction deal logging and proof system.')
+        .setDescription('P2P USDT transaction deal logging, market prices, and proof system.')
         .setDMPermission(false)
+
+        // Subcommand: Post real-time Market Price Update
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('price')
+                .setDescription('Posts an ultra-professional USDT Buy/Sell market price update.')
+                .addNumberOption(option =>
+                    option.setName('buy_price')
+                        .setDescription('Buy rate per USDT (e.g. 102.5)')
+                        .setRequired(true)
+                )
+                .addNumberOption(option =>
+                    option.setName('sell_price')
+                        .setDescription('Sell rate per USDT (e.g. 97.5)')
+                        .setRequired(true)
+                )
+                .addStringOption(option =>
+                    option.setName('currency')
+                        .setDescription('Currency symbol (Default: ₹ INR)')
+                        .setRequired(false)
+                        .addChoices(
+                            { name: '₹ (INR)', value: '₹' },
+                            { name: '$ (USD)', value: '$' },
+                            { name: '€ (EUR)', value: '€' },
+                            { name: '£ (GBP)', value: '£' },
+                            { name: '₨ (PKR)', value: '₨' }
+                        )
+                )
+                .addStringOption(option =>
+                    option.setName('ping')
+                        .setDescription('Ping option for price update message')
+                        .setRequired(false)
+                        .addChoices(
+                            { name: 'None', value: 'none' },
+                            { name: '@everyone', value: '@everyone' },
+                            { name: '@here', value: '@here' }
+                        )
+                )
+                .addChannelOption(option =>
+                    option.setName('channel')
+                        .setDescription('Target price channel (e.g. #usdt-price)')
+                        .addChannelTypes(ChannelType.GuildText)
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('payment_methods')
+                        .setDescription('Custom payment methods (e.g. "UPI • IMPS • GPay • Bank Transfer")')
+                        .setRequired(false)
+                )
+        )
 
         // Subcommand: Auto-detect & log deal from current channel messages
         .addSubcommand(subcommand =>
@@ -105,7 +155,7 @@ export default {
                 )
                 .addStringOption(option =>
                     option.setName('footer')
-                        .setDescription('Custom embed footer text (e.g., "Auto-MM Successful Deal")')
+                        .setDescription('Custom embed footer text (e.g., "Vanta Verified Successful Deal")')
                         .setRequired(false)
                 )
         )
@@ -143,7 +193,6 @@ export default {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'deal') {
-            // Public non-ephemeral defer so the deal proof is a permanent public channel message
             const deferred = await InteractionHelper.safeDefer(interaction, {});
             if (!deferred) return;
             return await handleDeal(interaction);
@@ -153,6 +202,12 @@ export default {
             const deferred = await InteractionHelper.safeDefer(interaction, {});
             if (!deferred) return;
             return await handleAutoLog(interaction);
+        }
+
+        if (subcommand === 'price') {
+            const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+            if (!deferred) return;
+            return await handlePriceUpdate(interaction);
         }
 
         const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
@@ -171,6 +226,81 @@ export default {
         }
     }
 };
+
+/**
+ * Handle posting Market Price Update
+ */
+async function handlePriceUpdate(interaction) {
+    const config = await getP2PConfig(interaction.guildId);
+
+    const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
+    const hasStaffRole = config.staffRoleId ? interaction.member.roles.cache.has(config.staffRoleId) : false;
+
+    if (!hasManageGuild && !hasStaffRole) {
+        return await replyUserError(interaction, {
+            type: ErrorTypes.PERMISSION,
+            message: 'You need permission to post price updates.'
+        });
+    }
+
+    const buyPrice = interaction.options.getNumber('buy_price');
+    const sellPrice = interaction.options.getNumber('sell_price');
+    const symbol = interaction.options.getString('currency') || '₹';
+    const pingOption = interaction.options.getString('ping') || 'none';
+    const channelOverride = interaction.options.getChannel('channel');
+    const paymentMethods = interaction.options.getString('payment_methods');
+
+    const targetChannel = channelOverride || (config.priceChannelId ? interaction.guild.channels.cache.get(config.priceChannelId) : interaction.channel);
+
+    if (!targetChannel) {
+        return await replyUserError(interaction, {
+            type: ErrorTypes.VALIDATION,
+            message: 'Target price channel was not found.'
+        });
+    }
+
+    const priceEmbed = buildPriceUpdateEmbed({
+        buyPrice,
+        sellPrice,
+        symbol,
+        paymentMethods
+    }, interaction.guild.name || 'Vanta Network');
+
+    const componentsRow = buildPriceComponents(config.vouchChannelId);
+
+    let contentPayload = {};
+    if (pingOption === '@everyone') {
+        contentPayload.content = '@everyone';
+    } else if (pingOption === '@here') {
+        contentPayload.content = '@here';
+    }
+
+    try {
+        await targetChannel.send({
+            ...contentPayload,
+            embeds: [priceEmbed],
+            components: [componentsRow]
+        });
+    } catch (err) {
+        logger.error('Failed to post price update embed', { error: err.message, channelId: targetChannel.id });
+        return await replyUserError(interaction, {
+            type: ErrorTypes.DISCORD_API,
+            message: `Failed to post price update in <#${targetChannel.id}>.`
+        });
+    }
+
+    return await InteractionHelper.safeEditReply(interaction, {
+        embeds: [
+            successEmbed(
+                'Market Price Update Published!',
+                `The live USDT Market Price Update has been posted to <#${targetChannel.id}>!\n\n` +
+                `• **Buy Rate:** ${symbol} ${buyPrice}\n` +
+                `• **Sell Rate:** ${symbol} ${sellPrice}\n` +
+                `• **Ping:** \`${pingOption}\``
+            )
+        ]
+    });
+}
 
 /**
  * Handle Auto-Detection of P2P Deal from Channel Messages
@@ -212,7 +342,7 @@ async function handleAutoLog(interaction) {
     const dealEmbed = buildDealEmbed(dealRecord, config);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
-    if (targetChannel && targetChannel.id !== interaction.channel.id) {
+    if (targetChannel && targetChannel.id !== interaction.channel?.id) {
         const sentMsg = await targetChannel.send({
             embeds: [dealEmbed],
             components: [componentsRow]
@@ -229,7 +359,6 @@ async function handleAutoLog(interaction) {
             ]
         });
     } else {
-        // Direct public response in same channel - 100% permanent, no dismiss button
         return await InteractionHelper.safeEditReply(interaction, {
             embeds: [dealEmbed],
             components: [componentsRow]
@@ -350,7 +479,7 @@ async function handleDeal(interaction) {
     const dealEmbed = buildDealEmbed(dealRecord, config);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
-    if (targetChannel.id !== interaction.channel.id) {
+    if (targetChannel.id !== interaction.channel?.id) {
         let sentMsg;
         try {
             sentMsg = await targetChannel.send({
@@ -376,7 +505,6 @@ async function handleDeal(interaction) {
             ]
         });
     } else {
-        // Direct public interaction reply - 100% permanent, no dismiss button, no cross icon
         return await InteractionHelper.safeEditReply(interaction, {
             embeds: [dealEmbed],
             components: [componentsRow]
@@ -425,7 +553,8 @@ async function handleHistory(interaction) {
     const limit = Math.min(interaction.options.getInteger('limit') || 5, 10);
 
     const dealsKey = getP2PDealsKey(interaction.guildId);
-    let deals = await getFromDb(dealsKey, []);
+    const rawDeals = await getFromDb(dealsKey, []);
+    let deals = Array.isArray(rawDeals) ? rawDeals : [];
 
     if (targetUser) {
         deals = deals.filter(d => d.buyerId === targetUser.id || d.sellerId === targetUser.id);
