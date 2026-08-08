@@ -1,16 +1,32 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } from 'discord.js';
-import { getP2PConfig, saveP2PConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats } from '../../services/p2pService.js';
+import { getP2PConfig, saveP2PConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel } from '../../services/p2pService.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
-import { getFromDb, getP2PDealsKey } from '../../utils/database.js';
 
 export default {
     data: new SlashCommandBuilder()
         .setName('p2p')
         .setDescription('P2P USDT transaction deal logging and proof system.')
         .setDMPermission(false)
+
+        // Subcommand: Auto-detect & log deal from current channel messages
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('autolog')
+                .setDescription('Auto-detects transaction details from current ticket messages and posts proof.')
+                .addUserOption(option =>
+                    option.setName('buyer')
+                        .setDescription('Override buyer (optional, auto-detected if left empty)')
+                        .setRequired(false)
+                )
+                .addUserOption(option =>
+                    option.setName('seller')
+                        .setDescription('Override seller (optional, auto-detected if left empty)')
+                        .setRequired(false)
+                )
+        )
 
         // Subcommand: Log a completed deal
         .addSubcommand(subcommand =>
@@ -127,10 +143,15 @@ export default {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'deal') {
-            // Non-ephemeral defer for public deals so proof is permanent
             const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
             if (!deferred) return;
             return await handleDeal(interaction);
+        }
+
+        if (subcommand === 'autolog') {
+            const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+            if (!deferred) return;
+            return await handleAutoLog(interaction);
         }
 
         const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
@@ -149,6 +170,67 @@ export default {
         }
     }
 };
+
+/**
+ * Handle Auto-Detection of P2P Deal from Channel Messages
+ */
+async function handleAutoLog(interaction) {
+    const config = await getP2PConfig(interaction.guildId);
+
+    const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
+    const hasStaffRole = config.staffRoleId ? interaction.member.roles.cache.has(config.staffRoleId) : false;
+
+    if (!hasManageGuild && !hasStaffRole) {
+        return await replyUserError(interaction, {
+            type: ErrorTypes.PERMISSION,
+            message: 'You need permission to run auto-log.'
+        });
+    }
+
+    const detected = await autoDetectDealFromChannel(interaction.channel, interaction.guildId);
+
+    const overrideBuyer = interaction.options.getUser('buyer');
+    const overrideSeller = interaction.options.getUser('seller');
+
+    const buyerId = overrideBuyer ? overrideBuyer.id : (detected.buyerId || interaction.user.id);
+    const sellerId = overrideSeller ? overrideSeller.id : (detected.sellerId || interaction.user.id);
+
+    const targetChannel = config.dealChannelId ? interaction.guild.channels.cache.get(config.dealChannelId) : interaction.channel;
+
+    const dealRecord = await logDeal(interaction.guildId, {
+        buyerId,
+        sellerId,
+        usdtAmount: detected.usdtAmount,
+        usdAmount: detected.usdAmount,
+        txHash: detected.txHash,
+        dealInfo: detected.dealInfo,
+        status: 'Completed',
+        loggedBy: interaction.user.id
+    });
+
+    const dealEmbed = buildDealEmbed(dealRecord, config);
+    const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
+
+    const sentMsg = await targetChannel.send({
+        embeds: [dealEmbed],
+        components: [componentsRow]
+    });
+
+    dealRecord.messageId = sentMsg.id;
+    dealRecord.channelId = targetChannel.id;
+
+    return await InteractionHelper.safeEditReply(interaction, {
+        embeds: [
+            successEmbed(
+                'Auto-Log Successful!',
+                `Auto-scanned ticket channel and published deal proof to <#${targetChannel.id}>!\n\n` +
+                `• **Parties:** <@${buyerId}> ↔️ <@${sellerId}>\n` +
+                `• **Amount:** ${detected.usdtAmount} USDT ($${detected.usdAmount})\n` +
+                `• **Tx Hash:** \`${detected.txHash || 'Auto-Detected'}\``
+            )
+        ]
+    });
+}
 
 /**
  * Handle P2P setup configuration
@@ -201,12 +283,6 @@ async function handleSetup(interaction) {
     if (staffRole) changes.push(`• **Staff Role:** <@&${staffRole.id}>`);
     if (footerText) changes.push(`• **Footer Label:** \`${footerText}\``);
 
-    logger.info('P2P system configuration updated', {
-        guildId: interaction.guildId,
-        updatedBy: interaction.user.id,
-        changes: updateObj
-    });
-
     return await InteractionHelper.safeEditReply(interaction, {
         embeds: [
             successEmbed(
@@ -223,7 +299,6 @@ async function handleSetup(interaction) {
 async function handleDeal(interaction) {
     const config = await getP2PConfig(interaction.guildId);
 
-    // Permission check
     const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
     const hasStaffRole = config.staffRoleId ? interaction.member.roles.cache.has(config.staffRoleId) : false;
 
@@ -247,7 +322,6 @@ async function handleDeal(interaction) {
     const status = interaction.options.getString('status') || 'Completed';
     const channelOverride = interaction.options.getChannel('channel');
 
-    // Determine target channel
     const targetChannel = channelOverride || (config.dealChannelId ? interaction.guild.channels.cache.get(config.dealChannelId) : interaction.channel);
 
     if (!targetChannel) {
@@ -257,7 +331,6 @@ async function handleDeal(interaction) {
         });
     }
 
-    // Save deal record
     const dealRecord = await logDeal(interaction.guildId, {
         buyerId: buyer.id,
         sellerId: seller.id,
@@ -269,13 +342,11 @@ async function handleDeal(interaction) {
         loggedBy: interaction.user.id
     });
 
-    // Build permanent embed & components matching exact reference design
     const dealEmbed = buildDealEmbed(dealRecord, config);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
     let sentMsg;
     try {
-        // Send as PERMANENT PUBLIC MESSAGE in target channel (Never ephemeral)
         sentMsg = await targetChannel.send({
             embeds: [dealEmbed],
             components: [componentsRow]
@@ -291,16 +362,6 @@ async function handleDeal(interaction) {
         });
     }
 
-    logger.info('P2P Deal logged successfully', {
-        dealId: dealRecord.dealId,
-        guildId: interaction.guildId,
-        buyerId: buyer.id,
-        sellerId: seller.id,
-        usdtAmount,
-        targetChannelId: targetChannel.id
-    });
-
-    // Ephemeral confirmation receipt to admin
     return await InteractionHelper.safeEditReply(interaction, {
         embeds: [
             successEmbed(

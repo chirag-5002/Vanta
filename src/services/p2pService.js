@@ -1,5 +1,5 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getFromDb, setInDb, getP2PConfigKey, getP2PDealsKey, getP2PDealKey, getP2PUserStatsKey } from '../utils/database.js';
+import { getFromDb, setInDb, getP2PConfigKey, getP2PDealsKey, getP2PDealKey, getP2PUserStatsKey, getTicketData } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 
 export const DEFAULT_P2P_CONFIG = {
@@ -58,6 +58,97 @@ function formatTxHash(txHash) {
 }
 
 /**
+ * Automatically scans a ticket channel to detect Buyer, Seller, Amount, Tx Hash, and Deal Info.
+ */
+export async function autoDetectDealFromChannel(channel, guildId) {
+    let buyerId = null;
+    let sellerId = null;
+    let usdtAmount = null;
+    let txHash = null;
+    let dealInfo = null;
+
+    try {
+        // 1. Detect Buyer from Ticket Database Data
+        const ticketData = await getTicketData(guildId, channel.id);
+        if (ticketData?.userId) {
+            buyerId = ticketData.userId;
+        }
+
+        // 2. Fetch last 50 messages from channel to auto-extract trade details
+        const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+
+        if (messages && messages.size > 0) {
+            const msgArray = Array.from(messages.values()).reverse();
+
+            // Find human members in channel
+            const humanMentionIds = new Set();
+            for (const msg of msgArray) {
+                if (!msg.author.bot) {
+                    humanMentionIds.add(msg.author.id);
+                }
+                msg.mentions.users.forEach(u => {
+                    if (!u.bot) humanMentionIds.add(u.id);
+                });
+            }
+
+            const humanList = Array.from(humanMentionIds);
+            if (!buyerId && humanList.length > 0) {
+                buyerId = humanList[0];
+            }
+            if (humanList.length > 1) {
+                sellerId = humanList.find(id => id !== buyerId) || humanList[1];
+            }
+
+            // Regex patterns for Tx Hash, Amount, and Info
+            const txRegex = /(0x[a-fA-F0-9]{40,66})|(https?:\/\/(bscscan|etherscan|tronscan|solscan)[^\s]+)/i;
+            const amountRegex = /(\b\d+(\.\d+)?\b)\s*(usdt|usd|\$)/i;
+            const altAmountRegex = /(amount|total|price|paid|sent)[:\s]*\$?(\d+(\.\d+)?)/i;
+
+            for (const msg of msgArray) {
+                if (msg.author.bot) continue;
+
+                const text = msg.content || '';
+
+                // Extract Tx Hash
+                if (!txHash) {
+                    const txMatch = text.match(txRegex);
+                    if (txMatch) {
+                        txHash = txMatch[1] || txMatch[2];
+                    }
+                }
+
+                // Extract USDT Amount
+                if (!usdtAmount) {
+                    const amtMatch = text.match(amountRegex) || text.match(altAmountRegex);
+                    if (amtMatch) {
+                        const parsed = parseFloat(amtMatch[1] || amtMatch[2]);
+                        if (!isNaN(parsed) && parsed > 0) {
+                            usdtAmount = parsed;
+                        }
+                    }
+                }
+
+                // Extract Deal Info
+                if (!dealInfo && (text.toLowerCase().includes('wallet') || text.toLowerCase().includes('inr') || text.toLowerCase().includes('binance') || text.toLowerCase().includes('p2p') || text.toLowerCase().includes('bank'))) {
+                    dealInfo = text.substring(0, 80).replace(/\n/g, ' ');
+                }
+            }
+        }
+    } catch (err) {
+        logger.error('Error auto-detecting deal info from channel:', { error: err.message, channelId: channel.id });
+    }
+
+    return {
+        buyerId,
+        sellerId,
+        usdtAmount: usdtAmount || 100,
+        usdAmount: usdtAmount || 100,
+        txHash: txHash || null,
+        dealInfo: dealInfo || 'P2P USDT Deal'
+    };
+}
+
+/**
  * Builds the P2P Deal Log Embed matching reference design.
  */
 export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate = null) {
@@ -72,7 +163,6 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
     const dealInfoText = deal.dealInfo || 'P2P USDT Transfer';
     const statusText = deal.status || 'Completed';
 
-    // Format description as blockquote matching reference design
     const description = [
         `> **Between:** <@${deal.buyerId}> and <@${deal.sellerId}>`,
         `> **Amount:** ≈ ${usdVal} / ${usdtVal}`,
@@ -108,7 +198,6 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
 export function buildDealComponents(vouchChannelId, dealId) {
     const row = new ActionRowBuilder();
 
-    // Vouch Channel Button / Link
     const targetVouchLabel = vouchChannelId ? `Done reading? Check out #${vouchChannelId}` : 'Done reading? Check out #gws-vouches';
     
     row.addComponents(
@@ -119,7 +208,6 @@ export function buildDealComponents(vouchChannelId, dealId) {
             .setEmoji('📌')
     );
 
-    // Submit Vouch Button
     row.addComponents(
         new ButtonBuilder()
             .setCustomId(`p2p_vouch_btn:${dealId}`)
