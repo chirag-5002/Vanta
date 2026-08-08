@@ -3,7 +3,6 @@
 import { EmbedBuilder } from 'discord.js';
 import { getColor, botConfig } from '../config/bot.js';
 
-const EMOJI_REGEX = /[\p{Extended_Pictographic}\uFE0F]/gu;
 const EMBED_FOOTER_SYMBOL = Symbol('titanbotFooterText');
 const EMBED_BASE_DESCRIPTION_SYMBOL = Symbol('titanbotBaseDescription');
 
@@ -13,7 +12,7 @@ function sanitizeEmbedText(text = '') {
   }
 
   return text
-    .replace(EMOJI_REGEX, '')
+    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '')
     .replace(/[ \t]+/g, ' ')  // Replace consecutive spaces/tabs with single space
     .replace(/[ \t]\n/g, '\n')  // Remove spaces before newlines
     .replace(/\n[ \t]/g, '\n')  // Remove spaces after newlines
