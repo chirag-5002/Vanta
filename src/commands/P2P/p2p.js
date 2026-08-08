@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getP2PConfig, saveP2PConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents } from '../../services/p2pService.js';
+import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents } from '../../services/p2pService.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -10,6 +10,58 @@ export default {
         .setName('p2p')
         .setDescription('P2P USDT transaction deal logging, market prices, and ticket system.')
         .setDMPermission(false)
+
+        // Subcommand: Configure Payment Accounts & Deposit Wallets
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('payments')
+                .setDescription('Configures UPI ID, Bank IMPS, CDM, and Crypto Deposit Wallets for automatic dispatch.')
+                .addStringOption(option =>
+                    option.setName('upi_id')
+                        .setDescription('UPI ID for Buy USDT payments (e.g. name@upi)')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('upi_qr_url')
+                        .setDescription('UPI QR Code Image URL')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('imps_account')
+                        .setDescription('IMPS Bank Account Number')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('imps_ifsc')
+                        .setDescription('IMPS IFSC Code')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('imps_name')
+                        .setDescription('IMPS Bank Account Holder Name')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('cdm_account')
+                        .setDescription('CDM Cash Deposit Account Details')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('trc20_wallet')
+                        .setDescription('USDT TRC20 Deposit Wallet Address')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('erc20_wallet')
+                        .setDescription('USDT ERC20 Deposit Wallet Address')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('bep20_wallet')
+                        .setDescription('USDT BEP20 Deposit Wallet Address')
+                        .setRequired(false)
+                )
+        )
 
         // Subcommand: Post Buy/Sell USDT Ticket Creation Panel
         .addSubcommand(subcommand =>
@@ -234,6 +286,12 @@ export default {
             return await handleTicketPanel(interaction);
         }
 
+        if (subcommand === 'payments') {
+            const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+            if (!deferred) return;
+            return await handlePaymentConfig(interaction);
+        }
+
         const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
         if (!deferred) return;
 
@@ -250,6 +308,69 @@ export default {
         }
     }
 };
+
+/**
+ * Handle payment accounts configuration
+ */
+async function handlePaymentConfig(interaction) {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+        return await replyUserError(interaction, {
+            type: ErrorTypes.PERMISSION,
+            message: 'You need `Manage Server` permission to configure payment accounts.'
+        });
+    }
+
+    const upiId = interaction.options.getString('upi_id');
+    const upiQrUrl = interaction.options.getString('upi_qr_url');
+    const impsAccount = interaction.options.getString('imps_account');
+    const impsIfsc = interaction.options.getString('imps_ifsc');
+    const impsName = interaction.options.getString('imps_name');
+    const cdmAccount = interaction.options.getString('cdm_account');
+    const trc20Wallet = interaction.options.getString('trc20_wallet');
+    const erc20Wallet = interaction.options.getString('erc20_wallet');
+    const bep20Wallet = interaction.options.getString('bep20_wallet');
+
+    const updateObj = {};
+    if (upiId) updateObj.upiId = upiId;
+    if (upiQrUrl) updateObj.upiQrUrl = upiQrUrl;
+    if (impsAccount) updateObj.impsAccount = impsAccount;
+    if (impsIfsc) updateObj.impsIfsc = impsIfsc;
+    if (impsName) updateObj.impsName = impsName;
+    if (cdmAccount) updateObj.cdmAccount = cdmAccount;
+    if (trc20Wallet) updateObj.trc20Wallet = trc20Wallet;
+    if (erc20Wallet) updateObj.erc20Wallet = erc20Wallet;
+    if (bep20Wallet) updateObj.bep20Wallet = bep20Wallet;
+
+    if (Object.keys(updateObj).length === 0) {
+        const current = await getP2PPaymentConfig(interaction.guildId);
+        return await InteractionHelper.safeEditReply(interaction, {
+            embeds: [
+                infoEmbed(
+                    'P2P Payment & Deposit Wallet Configuration',
+                    `**Configured Automated Accounts:**\n` +
+                    `• **UPI ID:** \`${current.upiId}\`\n` +
+                    `• **IMPS Bank Account:** \`${current.impsAccount}\` (IFSC: \`${current.impsIfsc}\` - \`${current.impsName}\`)\n` +
+                    `• **CDM Account:** \`${current.cdmAccount}\`\n` +
+                    `• **TRC20 Deposit Wallet:** \`${current.trc20Wallet}\`\n` +
+                    `• **ERC20 Deposit Wallet:** \`${current.erc20Wallet}\`\n` +
+                    `• **BEP20 Deposit Wallet:** \`${current.bep20Wallet}\`\n\n` +
+                    `Use options in \`/p2p payments\` to update any of these details.`
+                )
+            ]
+        });
+    }
+
+    await saveP2PPaymentConfig(interaction.guildId, updateObj);
+
+    return await InteractionHelper.safeEditReply(interaction, {
+        embeds: [
+            successEmbed(
+                'Payment Accounts Updated!',
+                'Successfully saved your automated payment & deposit wallet details!'
+            )
+        ]
+    });
+}
 
 /**
  * Handle Posting P2P Ticket Creation Panel
@@ -621,7 +742,7 @@ async function handleStats(interaction) {
         return await InteractionHelper.safeEditReply(interaction, {
             embeds: [
                 infoEmbed(
-                    `Server P2P Transaction Statistics`,
+                    `Server P2P Statistics`,
                     `• **Total Completed Deals:** \`${guildStats.completedDeals}\` deals\n` +
                     `• **Total P2P Volume Processed:** \`${guildStats.totalUsdtVolume.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT\`\n\n` +
                     `*P2P transactions logged via TitanBot Middleman system.*`

@@ -169,12 +169,16 @@ const UserMessages = {
 };
 
 export function getUserMessage(error, context = {}) {
-    const type = categorizeError(error);
-    const messages = UserMessages[type] || UserMessages[ErrorTypes.UNKNOWN];
-
     if (error.userMessage) {
         return error.userMessage;
     }
+
+    if (error?.message && typeof error.message === 'string' && error.message.trim().length > 0 && !error.message.includes('[object Object]')) {
+        return error.message;
+    }
+
+    const type = categorizeError(error);
+    const messages = UserMessages[type] || UserMessages[ErrorTypes.UNKNOWN];
 
     if (context.subtype && messages[context.subtype]) {
         return messages[context.subtype];

@@ -12,6 +12,21 @@ export const DEFAULT_P2P_CONFIG = {
     embedColor: '#FFC107', // Amber/Yellow matching reference design
 };
 
+export const DEFAULT_PAYMENT_CONFIG = {
+    upiId: 'vanta@upi',
+    upiQrUrl: null,
+    impsAccount: '998877665544',
+    impsIfsc: 'SBIN0001234',
+    impsName: 'Vanta P2P Exchange',
+    cdmAccount: '998877665544 (State Bank of India)',
+    trc20Wallet: 'T9xVantaUSDTTRC20OfficialWalletAddress',
+    erc20Wallet: '0x71C569VantaUSDTERC20OfficialWalletAddress',
+    bep20Wallet: '0x71C569VantaUSDTBEP20OfficialWalletAddress',
+    usdcTrc20Wallet: 'T9xVantaUSDCTRC20OfficialWalletAddress',
+    usdcErc20Wallet: '0x71C569VantaUSDCERC20OfficialWalletAddress',
+    usdcBep20Wallet: '0x71C569VantaUSDCBEP20OfficialWalletAddress',
+};
+
 /**
  * Retrieves the P2P configuration for a guild.
  */
@@ -30,6 +45,28 @@ export async function saveP2PConfig(guildId, newConfig) {
     const current = await getP2PConfig(guildId);
     const updated = { ...current, ...newConfig };
     const key = getP2PConfigKey(guildId);
+    await setInDb(key, updated);
+    return updated;
+}
+
+/**
+ * Retrieves payment configuration for a guild.
+ */
+export async function getP2PPaymentConfig(guildId) {
+    if (!guildId) return { ...DEFAULT_PAYMENT_CONFIG };
+    const key = `guild:${guildId}:p2p:payments`;
+    const data = await getFromDb(key, {});
+    return { ...DEFAULT_PAYMENT_CONFIG, ...data };
+}
+
+/**
+ * Saves payment configuration for a guild.
+ */
+export async function saveP2PPaymentConfig(guildId, newPayments) {
+    if (!guildId) return;
+    const current = await getP2PPaymentConfig(guildId);
+    const updated = { ...current, ...newPayments };
+    const key = `guild:${guildId}:p2p:payments`;
     await setInDb(key, updated);
     return updated;
 }
@@ -56,6 +93,192 @@ function formatTxHash(txHash) {
         return `\`${txHash.substring(0, 10)}...${txHash.substring(txHash.length - 8)}\``;
     }
     return `\`${txHash}\``;
+}
+
+/**
+ * Builds payment instruction embed for BUY tickets based on payment method selected.
+ */
+export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CONFIG) {
+    const method = (paymentMethod || '').toUpperCase();
+    const embed = new EmbedBuilder().setColor('#2ECC71');
+
+    if (method === 'UPI') {
+        embed.setTitle('💳 Official UPI Payment Details')
+            .setDescription(
+                `Please pay the exact amount using the UPI details below:\n\n` +
+                `> **UPI ID:** \`${config.upiId}\`\n\n` +
+                `📸 **Instruction:** Once payment is complete, please upload your **Payment Screenshot** in this ticket channel.`
+            );
+        if (config.upiQrUrl) {
+            embed.setImage(config.upiQrUrl);
+        }
+    } else if (method === 'IMPS') {
+        embed.setTitle('🏦 Official IMPS Bank Transfer Details')
+            .setDescription(
+                `Please transfer the exact amount via IMPS using the bank details below:\n\n` +
+                `> **Account Number:** \`${config.impsAccount}\`\n` +
+                `> **IFSC Code:** \`${config.impsIfsc}\`\n` +
+                `> **Account Name:** \`${config.impsName}\`\n\n` +
+                `📸 **Instruction:** Once IMPS transfer is complete, please upload your **Payment Screenshot** in this ticket channel.`
+            );
+    } else if (method === 'CDM') {
+        embed.setTitle('🏧 Official CDM Cash Deposit Details')
+            .setDescription(
+                `Please deposit cash via CDM using the account details below:\n\n` +
+                `> **CDM Account:** \`${config.cdmAccount}\`\n\n` +
+                `📸 **Instruction:** Once cash deposit is complete, please upload your **CDM Deposit Receipt Screenshot** in this ticket channel.`
+            );
+    } else {
+        embed.setTitle('💳 Official CCW Deposit Instructions')
+            .setDescription(
+                `CCW Payment Method selected.\n\n` +
+                `A verified Middleman / Support staff will provide custom CCW payment instructions in this ticket shortly.`
+            );
+    }
+
+    embed.setFooter({ text: 'Vanta Payment Security • Verify details before sending' });
+    return embed;
+}
+
+/**
+ * Builds deposit wallet instruction embed for SELL tickets based on network selected.
+ */
+export function buildSellPaymentEmbed(network, config = DEFAULT_PAYMENT_CONFIG) {
+    const net = (network || '').toUpperCase();
+    const embed = new EmbedBuilder().setColor('#E74C3C');
+
+    let walletAddress = config.trc20Wallet;
+    let label = 'USDT (TRC20)';
+
+    if (net.includes('USDT') && net.includes('ERC20')) {
+        walletAddress = config.erc20Wallet;
+        label = 'USDT (ERC20)';
+    } else if (net.includes('USDT') && net.includes('BEP20')) {
+        walletAddress = config.bep20Wallet;
+        label = 'USDT (BEP20)';
+    } else if (net.includes('USDC') && net.includes('TRC20')) {
+        walletAddress = config.usdcTrc20Wallet;
+        label = 'USDC (TRC20)';
+    } else if (net.includes('USDC') && net.includes('ERC20')) {
+        walletAddress = config.usdcErc20Wallet;
+        label = 'USDC (ERC20)';
+    } else if (net.includes('USDC') && net.includes('BEP20')) {
+        walletAddress = config.usdcBep20Wallet;
+        label = 'USDC (BEP20)';
+    }
+
+    embed.setTitle(`📥 Official Deposit Wallet for ${label}`)
+        .setDescription(
+            `Please transfer your crypto to the official deposit wallet address below:\n\n` +
+            `> **Network:** \`${label}\`\n` +
+            `> **Deposit Address:** \`${walletAddress}\`\n\n` +
+            `📸 **Instruction:** Once sent, please upload your **Transaction Screenshot / Tx Hash link** in this ticket channel.`
+        )
+        .setFooter({ text: 'Vanta Wallet Security • Ensure network matches before sending' });
+
+    return embed;
+}
+
+/**
+ * Automatically detects `#looking-to-buy` and `#looking-to-sell` channels in a guild
+ * and deploys/maintains the Buy (with/without KYC) and Sell (with/without KYC) ticket panels automatically.
+ */
+export async function autoDeployP2PPanels(guild) {
+    if (!guild || !guild.channels) return;
+
+    try {
+        const channels = await guild.channels.fetch().catch(() => null);
+        if (!channels) return;
+
+        const buyChannel = channels.find(c => c && c.isTextBased() && (
+            c.name.includes('looking-to-buy') || c.name.includes('buy-usdt') || c.name === 'buy'
+        ));
+
+        const sellChannel = channels.find(c => c && c.isTextBased() && (
+            c.name.includes('looking-to-sell') || c.name.includes('sell-usdt') || c.name === 'sell'
+        ));
+
+        if (buyChannel) {
+            const msgs = await buyChannel.messages.fetch({ limit: 10 }).catch(() => null);
+            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_buy_kyc')) && m.embeds.some(e => e.description?.includes('Buy with KYC')));
+            
+            if (!botHasNewPanel) {
+                if (msgs) {
+                    const oldPanels = msgs.filter(m => m.author.id === guild.client.user.id);
+                    for (const m of oldPanels.values()) {
+                        await m.delete().catch(() => null);
+                    }
+                }
+
+                const buyEmbed = new EmbedBuilder()
+                    .setTitle('🟢 Buy USDT - P2P Portal')
+                    .setDescription(
+                        `Welcome to **${guild.name}** USDT Buying Portal!\n\n` +
+                        `Select an option below to open an instant 1-on-1 Middleman Buy Ticket:\n\n` +
+                        `• **🟢 Buy with KYC:** KYC Verified trade with higher limits.\n` +
+                        `• **🟢 Buy without KYC:** Instant Non-KYC quick trade.\n\n` +
+                        `*🛡️ All trades are 100% protected by Vanta Auto-MM Security.*`
+                    )
+                    .setColor('#2ECC71')
+                    .setFooter({ text: `${guild.name} • Official P2P Buy Portal` });
+
+                const buyRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('p2p_trade_buy_kyc')
+                        .setLabel('🟢 Buy with KYC')
+                        .setStyle(ButtonStyle.Success),
+                    new ButtonBuilder()
+                        .setCustomId('p2p_trade_buy_nokyc')
+                        .setLabel('🟢 Buy without KYC')
+                        .setStyle(ButtonStyle.Primary)
+                );
+
+                await buyChannel.send({ embeds: [buyEmbed], components: [buyRow] }).catch(() => null);
+            }
+        }
+
+        if (sellChannel) {
+            const msgs = await sellChannel.messages.fetch({ limit: 10 }).catch(() => null);
+            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_sell_kyc')) && m.embeds.some(e => e.description?.includes('Sell with KYC')));
+
+            if (!botHasNewPanel) {
+                if (msgs) {
+                    const oldPanels = msgs.filter(m => m.author.id === guild.client.user.id);
+                    for (const m of oldPanels.values()) {
+                        await m.delete().catch(() => null);
+                    }
+                }
+
+                const sellEmbed = new EmbedBuilder()
+                    .setTitle('🔴 Sell USDT - P2P Portal')
+                    .setDescription(
+                        `Welcome to **${guild.name}** USDT Selling Portal!\n\n` +
+                        `Select an option below to open an instant 1-on-1 Middleman Sell Ticket:\n\n` +
+                        `• **🔴 Sell with KYC:** Fast payout for KYC Verified sellers.\n` +
+                        `• **🔴 Sell without KYC:** Instant Non-KYC sell trade.\n\n` +
+                        `*🛡️ All trades are 100% protected by Vanta Auto-MM Security.*`
+                    )
+                    .setColor('#E74C3C')
+                    .setFooter({ text: `${guild.name} • Official P2P Sell Portal` });
+
+                const sellRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('p2p_trade_sell_kyc')
+                        .setLabel('🔴 Sell with KYC')
+                        .setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder()
+                        .setCustomId('p2p_trade_sell_nokyc')
+                        .setLabel('🔴 Sell without KYC')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+
+                await sellChannel.send({ embeds: [sellEmbed], components: [sellRow] }).catch(() => null);
+            }
+        }
+
+    } catch (err) {
+        logger.error('Error in autoDeployP2PPanels:', err.message);
+    }
 }
 
 /**
@@ -148,7 +371,6 @@ export async function autoDetectDealFromChannel(channel, guildId) {
 export async function autoDetectAndPublishDeal(channel, guildId, executorId = null) {
     const config = await getP2PConfig(guildId);
     
-    // Auto-detect trade parameters from ticket channel
     const detected = await autoDetectDealFromChannel(channel, guildId);
     
     const targetChannel = config.dealChannelId 
@@ -160,7 +382,6 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
     const buyerId = detected.buyerId || executorId || channel.client?.user?.id;
     const sellerId = detected.sellerId || executorId || channel.client?.user?.id;
 
-    // Log the deal
     const dealRecord = await logDeal(guildId, {
         buyerId,
         sellerId,

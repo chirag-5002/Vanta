@@ -235,7 +235,7 @@ const NOTIFICATION_DEFAULT_TITLES = {
 };
 
 export const USER_ERROR_TITLES = {
-  validation: 'Invalid Input',
+  validation: 'Validation Error',
   permission: 'Permission Denied',
   configuration: 'Configuration Error',
   database: 'Database Error',

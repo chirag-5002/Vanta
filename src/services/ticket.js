@@ -84,10 +84,13 @@ export async function createTicket(guild, member, categoryId, reason = 'No reaso
     const config = await getGuildConfig(guild.client, guild.id);
     const ticketConfig = config.tickets || {};
     
-    const maxTicketsPerUser = config.maxTicketsPerUser ?? 3;
+    const maxTicketsPerUser = config.maxTicketsPerUser ?? 50;
     const currentTicketCount = await getUserTicketCount(guild.id, member.id);
     
-    if (currentTicketCount >= maxTicketsPerUser) {
+    const isStaffOrAdmin = member.permissions.has(PermissionFlagsBits.ManageGuild) || member.id === guild.ownerId;
+    const isP2pTrade = (reason || '').startsWith('Buy') || (reason || '').startsWith('Sell');
+
+    if (!isStaffOrAdmin && !isP2pTrade && currentTicketCount >= maxTicketsPerUser) {
       ticketUserError(
         `Max open tickets reached for ${member.id}`,
         `You have reached the maximum number of open tickets (${maxTicketsPerUser}). Please close your existing tickets before creating a new one.`,
