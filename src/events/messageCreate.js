@@ -37,12 +37,32 @@ export default {
 
       await handlePrefixCommand(message, client);
 
+      await handleAutoP2PKeyword(message);
+
       await handleLeveling(message, client);
     } catch (error) {
       logger.error('Error in messageCreate event:', error);
     }
   }
 };
+
+async function handleAutoP2PKeyword(message) {
+  try {
+    const channelName = message.channel?.name?.toLowerCase() || '';
+    if (!channelName.includes('ticket') && !channelName.includes('p2p')) return;
+
+    const content = message.content || '';
+    const isTxHash = /(0x[a-fA-F0-9]{40,66})|(https?:\/\/(bscscan|etherscan|tronscan|solscan)[^\s]+)/i.test(content);
+    const isKeyword = /(deal done|complete deal|trade complete|deal completed|usdt sent)/i.test(content);
+
+    if (isTxHash || isKeyword) {
+      const { autoDetectAndPublishDeal } = await import('../services/p2pService.js');
+      await autoDetectAndPublishDeal(message.channel, message.guild.id, message.author.id);
+    }
+  } catch (err) {
+    logger.debug('Auto P2P Keyword Listener skipped:', err.message);
+  }
+}
 
 async function handlePrefixCommand(message, client) {
   try {

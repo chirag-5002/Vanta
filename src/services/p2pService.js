@@ -143,6 +143,50 @@ export async function autoDetectDealFromChannel(channel, guildId) {
 }
 
 /**
+ * Automatically scans a ticket channel, logs the deal, and posts the permanent embed.
+ */
+export async function autoDetectAndPublishDeal(channel, guildId, executorId = null) {
+    const config = await getP2PConfig(guildId);
+    
+    // Auto-detect trade parameters from ticket channel
+    const detected = await autoDetectDealFromChannel(channel, guildId);
+    
+    const targetChannel = config.dealChannelId 
+        ? channel.guild.channels.cache.get(config.dealChannelId) 
+        : channel;
+
+    if (!targetChannel) return null;
+
+    const buyerId = detected.buyerId || executorId || channel.client?.user?.id;
+    const sellerId = detected.sellerId || executorId || channel.client?.user?.id;
+
+    // Log the deal
+    const dealRecord = await logDeal(guildId, {
+        buyerId,
+        sellerId,
+        usdtAmount: detected.usdtAmount,
+        usdAmount: detected.usdAmount,
+        txHash: detected.txHash,
+        dealInfo: detected.dealInfo,
+        status: 'Completed',
+        loggedBy: executorId || buyerId
+    });
+
+    const dealEmbed = buildDealEmbed(dealRecord, config);
+    const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
+
+    const sentMsg = await targetChannel.send({
+        embeds: [dealEmbed],
+        components: [componentsRow]
+    });
+
+    dealRecord.messageId = sentMsg.id;
+    dealRecord.channelId = targetChannel.id;
+
+    return dealRecord;
+}
+
+/**
  * Builds the P2P Deal Log Embed matching reference design.
  */
 export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate = null) {
