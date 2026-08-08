@@ -4,6 +4,19 @@ import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPayme
 import { logger } from '../../../utils/logger.js';
 import { errorEmbed } from '../../../utils/embeds.js';
 
+function safeGetField(fields, ...keys) {
+    if (!fields) return null;
+    for (const key of keys) {
+        try {
+            const val = fields.getTextInputValue(key);
+            if (val) return val;
+        } catch (_) {
+            // Ignore missing field errors
+        }
+    }
+    return null;
+}
+
 export const p2pWizardModalHandler = {
     name: 'p2p_wizard_modal',
     async execute(interaction, client, args) {
@@ -19,31 +32,18 @@ export const p2pWizardModalHandler = {
             const config = await getP2PConfig(interaction.guildId);
             const paymentConfig = await getP2PPaymentConfig(interaction.guildId);
 
-            let amountDisplay = '100';
-            let paymentMethod = 'UPI';
+            // Resilient field extractions (supports old & new modal field names)
+            const amountDisplay = safeGetField(interaction.fields, 'q1_amount', 'amount') || '100';
+            const paymentMethod = (safeGetField(interaction.fields, 'q2_payment', 'payment') || 'UPI').toUpperCase();
             let networkLabel = 'USDT TRC20';
             let addressDisplay = 'N/A';
 
             if (isBuy) {
-                // BUY FLOW:
-                // 1. Amount
-                // 2. Payment Method (UPI, IMPS, CDM, CCW)
-                // 3. Network
-                // 4. Wallet Address
-                amountDisplay = interaction.fields.getTextInputValue('q1_amount') || '100';
-                paymentMethod = (interaction.fields.getTextInputValue('q2_payment') || 'UPI').toUpperCase();
-                networkLabel = (interaction.fields.getTextInputValue('q3_network') || 'USDT TRC20').toUpperCase();
-                addressDisplay = interaction.fields.getTextInputValue('q4_address') || 'N/A';
+                networkLabel = (safeGetField(interaction.fields, 'q3_network', 'network') || 'USDT TRC20').toUpperCase();
+                addressDisplay = safeGetField(interaction.fields, 'q4_address', 'address') || 'N/A';
             } else {
-                // SELL FLOW:
-                // 1. Amount
-                // 2. Payment Method (UPI, IMPS)
-                // 3. Payout Details (UPI/Bank)
-                // 4. Network
-                amountDisplay = interaction.fields.getTextInputValue('q1_amount') || '100';
-                paymentMethod = (interaction.fields.getTextInputValue('q2_payment') || 'UPI').toUpperCase();
-                addressDisplay = interaction.fields.getTextInputValue('q3_details') || 'N/A';
-                networkLabel = (interaction.fields.getTextInputValue('q4_network') || 'USDT TRC20').toUpperCase();
+                addressDisplay = safeGetField(interaction.fields, 'q3_details', 'address') || 'N/A';
+                networkLabel = (safeGetField(interaction.fields, 'q4_network', 'network') || 'USDT TRC20').toUpperCase();
             }
 
             const reason = `${isBuy ? 'Buy' : 'Sell'} ${amountDisplay} USDT via ${paymentMethod} (${networkLabel})`;
@@ -172,7 +172,7 @@ export const p2pWizardModalHandler = {
 
         } catch (err) {
             logger.error('Failed to create ticket from wizard modal:', err);
-            const userMsg = err.userMessage || err.message || 'Please close existing open tickets before creating a new ticket.';
+            const userMsg = err.userMessage || err.message || 'Failed to create ticket channel.';
             await interaction.editReply({
                 embeds: [
                     errorEmbed('Ticket Creation Notice', userMsg)
