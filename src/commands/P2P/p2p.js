@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getP2PConfig, saveP2PConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents } from '../../services/p2pService.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -8,8 +8,26 @@ import { logger } from '../../utils/logger.js';
 export default {
     data: new SlashCommandBuilder()
         .setName('p2p')
-        .setDescription('P2P USDT transaction deal logging, market prices, and proof system.')
+        .setDescription('P2P USDT transaction deal logging, market prices, and ticket system.')
         .setDMPermission(false)
+
+        // Subcommand: Post Buy/Sell USDT Ticket Creation Panel
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('panel')
+                .setDescription('Posts an interactive Buy USDT & Sell USDT ticket panel in any channel.')
+                .addChannelOption(option =>
+                    option.setName('channel')
+                        .setDescription('Target channel for ticket panel (e.g. #how-to-buy)')
+                        .addChannelTypes(ChannelType.GuildText)
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('title')
+                        .setDescription('Custom panel header title')
+                        .setRequired(false)
+                )
+        )
 
         // Subcommand: Post real-time Market Price Update
         .addSubcommand(subcommand =>
@@ -210,6 +228,12 @@ export default {
             return await handlePriceUpdate(interaction);
         }
 
+        if (subcommand === 'panel') {
+            const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+            if (!deferred) return;
+            return await handleTicketPanel(interaction);
+        }
+
         const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
         if (!deferred) return;
 
@@ -226,6 +250,68 @@ export default {
         }
     }
 };
+
+/**
+ * Handle Posting P2P Ticket Creation Panel
+ */
+async function handleTicketPanel(interaction) {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+        return await replyUserError(interaction, {
+            type: ErrorTypes.PERMISSION,
+            message: 'You need `Manage Server` permission to post the P2P ticket panel.'
+        });
+    }
+
+    const customTitle = interaction.options.getString('title') || '🛒 USDT P2P Trade Portal';
+    const channelOverride = interaction.options.getChannel('channel');
+    const targetChannel = channelOverride || interaction.channel;
+
+    const panelEmbed = new EmbedBuilder()
+        .setTitle(customTitle)
+        .setDescription(
+            `Welcome to **${interaction.guild.name}** P2P Exchange Portal!\n\n` +
+            `Need to **Buy** or **Sell** USDT securely?\n` +
+            `Click one of the buttons below to open a private 1-on-1 Middleman Trade Ticket with our verified support team!\n\n` +
+            `• **🟢 Buy USDT:** Open ticket to buy USDT via INR/UPI/Bank.\n` +
+            `• **🔴 Sell USDT:** Open ticket to sell USDT and receive instant payout.\n\n` +
+            `*🛡️ All transactions are 100% protected by Vanta Auto-MM Security.*`
+        )
+        .setColor('#FFC107')
+        .setFooter({ text: `${interaction.guild.name} • Official P2P Trade System` });
+
+    const buttonsRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('p2p_price_buy')
+            .setLabel('🟢 Buy USDT')
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId('p2p_price_sell')
+            .setLabel('🔴 Sell USDT')
+            .setStyle(ButtonStyle.Danger)
+    );
+
+    try {
+        await targetChannel.send({
+            embeds: [panelEmbed],
+            components: [buttonsRow]
+        });
+    } catch (err) {
+        logger.error('Failed to post ticket panel:', err);
+        return await replyUserError(interaction, {
+            type: ErrorTypes.DISCORD_API,
+            message: `Failed to post panel in <#${targetChannel.id}>.`
+        });
+    }
+
+    return await InteractionHelper.safeEditReply(interaction, {
+        embeds: [
+            successEmbed(
+                'P2P Ticket Panel Posted!',
+                `The interactive **Buy USDT & Sell USDT** Ticket Panel has been published to <#${targetChannel.id}>!`
+            )
+        ]
+    });
+}
 
 /**
  * Handle posting Market Price Update
