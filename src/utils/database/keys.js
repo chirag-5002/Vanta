@@ -124,6 +124,22 @@ export function getGiveawayLockKey(messageId) {
     return `giveaway:lock:${messageId}`;
 }
 
+export function getP2PConfigKey(guildId) {
+    return `guild:${guildId}:p2p:config`;
+}
+
+export function getP2PDealsKey(guildId) {
+    return `guild:${guildId}:p2p:deals`;
+}
+
+export function getP2PDealKey(guildId, dealId) {
+    return `guild:${guildId}:p2p:deal:${dealId}`;
+}
+
+export function getP2PUserStatsKey(guildId, userId) {
+    return `guild:${guildId}:p2p:user:${userId}`;
+}
+
 /**
  * Legacy key patterns mapped to canonical builders.
  * Used by migration script and read-time fallback.

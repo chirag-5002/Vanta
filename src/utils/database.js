@@ -46,6 +46,10 @@ export {
     getServerCountersKey,
     getGiveawayEntryKey,
     getGiveawayLockKey,
+    getP2PConfigKey,
+    getP2PDealsKey,
+    getP2PDealKey,
+    getP2PUserStatsKey,
     canonicalizeKey,
     getLegacyVariantsForCanonical,
 } from './database/keys.js';

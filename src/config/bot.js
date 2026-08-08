@@ -474,6 +474,7 @@ export const botConfig = {
     community: true,
     fun: true,
     music: true,
+    p2p: true,
   },
 };
 
@@ -540,6 +541,7 @@ const COMMAND_CATEGORY_FEATURE_MAP = {
   logging: "logging",
   moderation: "moderation",
   music: "music",
+  p2p: "p2p",
   reaction_roles: "reactionRoles",
   search: "search",
   serverstats: "counter",
@@ -549,6 +551,7 @@ const COMMAND_CATEGORY_FEATURE_MAP = {
   verification: "verification",
   welcome: "welcome",
 };
+
 
 function normalizeCategoryKey(category) {
   return String(category || "").trim().toLowerCase().replace(/\s+/g, "_");
