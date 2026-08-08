@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags } from 'discord.js';
 import { getP2PConfig, saveP2PConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats } from '../../services/p2pService.js';
-import { successEmbed, errorEmbed, infoEmbed } from '../../utils/embeds.js';
+import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { logger } from '../../utils/logger.js';
@@ -29,12 +29,12 @@ export default {
                 )
                 .addNumberOption(option =>
                     option.setName('usdt_amount')
-                        .setDescription('USDT amount traded (e.g. 75.00)')
+                        .setDescription('USDT amount traded (e.g. 75 or 2500)')
                         .setRequired(true)
                 )
                 .addNumberOption(option =>
                     option.setName('usd_amount')
-                        .setDescription('USD equivalent amount (e.g. 75.00, defaults to USDT amount)')
+                        .setDescription('USD value (Optional, defaults to USDT amount if 1:1)')
                         .setRequired(false)
                 )
                 .addStringOption(option =>
@@ -124,17 +124,20 @@ export default {
         ),
 
     async execute(interaction, guildConfig, client) {
+        const subcommand = interaction.options.getSubcommand();
+
+        if (subcommand === 'deal') {
+            // Non-ephemeral defer for public deals so proof is permanent
+            const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+            if (!deferred) return;
+            return await handleDeal(interaction);
+        }
+
         const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
         if (!deferred) return;
 
-        const subcommand = interaction.options.getSubcommand();
-
         if (subcommand === 'setup') {
             return await handleSetup(interaction);
-        }
-
-        if (subcommand === 'deal') {
-            return await handleDeal(interaction);
         }
 
         if (subcommand === 'stats') {
@@ -190,7 +193,7 @@ async function handleSetup(interaction) {
         });
     }
 
-    const saved = await saveP2PConfig(interaction.guildId, updateObj);
+    await saveP2PConfig(interaction.guildId, updateObj);
 
     const changes = [];
     if (dealChannel) changes.push(`• **Deal Log Channel:** <#${dealChannel.id}>`);
@@ -266,18 +269,18 @@ async function handleDeal(interaction) {
         loggedBy: interaction.user.id
     });
 
-    // Build embed & components matching exact design
+    // Build permanent embed & components matching exact reference design
     const dealEmbed = buildDealEmbed(dealRecord, config);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
     let sentMsg;
     try {
+        // Send as PERMANENT PUBLIC MESSAGE in target channel (Never ephemeral)
         sentMsg = await targetChannel.send({
             embeds: [dealEmbed],
             components: [componentsRow]
         });
 
-        // Save message ID to deal record
         dealRecord.messageId = sentMsg.id;
         dealRecord.channelId = targetChannel.id;
     } catch (err) {
@@ -297,14 +300,15 @@ async function handleDeal(interaction) {
         targetChannelId: targetChannel.id
     });
 
+    // Ephemeral confirmation receipt to admin
     return await InteractionHelper.safeEditReply(interaction, {
         embeds: [
             successEmbed(
-                'Transaction Logged Successfully!',
-                `The transaction proof embed has been posted in <#${targetChannel.id}>.\n\n` +
+                'Transaction Proof Published!',
+                `The permanent transaction proof embed has been posted in <#${targetChannel.id}>.\n\n` +
                 `• **Deal ID:** \`${dealRecord.dealId}\`\n` +
                 `• **Parties:** ${buyer} ↔️ ${seller}\n` +
-                `• **Amount:** $${usdAmount.toFixed(2)} USD / ${usdtAmount} USDT\n` +
+                `• **Amount:** $${usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD / ${usdtAmount} USDT\n` +
                 `• **Status:** \`${status}\``
             )
         ]
@@ -324,7 +328,7 @@ async function handleStats(interaction) {
                 infoEmbed(
                     `P2P Trade Stats for ${targetUser.username}`,
                     `• **Completed Deals:** \`${stats.completedDeals}\` / \`${stats.totalDeals}\` total\n` +
-                    `• **Total USDT Volume:** \`${stats.totalUsdtVolume.toFixed(2)} USDT\`\n` +
+                    `• **Total USDT Volume:** \`${stats.totalUsdtVolume.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT\`\n` +
                     `• **Last Trade:** ${stats.lastDealTimestamp ? `<t:${Math.floor(new Date(stats.lastDealTimestamp).getTime() / 1000)}:R>` : 'Never'}`
                 )
             ]
@@ -336,7 +340,7 @@ async function handleStats(interaction) {
                 infoEmbed(
                     `Server P2P Transaction Statistics`,
                     `• **Total Completed Deals:** \`${guildStats.completedDeals}\` deals\n` +
-                    `• **Total P2P Volume Processed:** \`${guildStats.totalUsdtVolume.toFixed(2)} USDT\`\n\n` +
+                    `• **Total P2P Volume Processed:** \`${guildStats.totalUsdtVolume.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT\`\n\n` +
                     `*P2P transactions logged via TitanBot Middleman system.*`
                 )
             ]

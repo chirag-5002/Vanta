@@ -1,4 +1,4 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getFromDb, setInDb, getP2PConfigKey, getP2PDealsKey, getP2PDealKey, getP2PUserStatsKey } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 
@@ -8,13 +8,11 @@ export const DEFAULT_P2P_CONFIG = {
     staffRoleId: null,
     titleText: 'Successful Transaction',
     footerText: 'Auto-MM Successful Deal',
-    embedColor: '#FFC107', // Amber/Yellow matching the reference design
+    embedColor: '#FFC107', // Amber/Yellow matching reference design
 };
 
 /**
  * Retrieves the P2P configuration for a guild.
- * @param {string} guildId 
- * @returns {Promise<typeof DEFAULT_P2P_CONFIG>}
  */
 export async function getP2PConfig(guildId) {
     if (!guildId) return { ...DEFAULT_P2P_CONFIG };
@@ -25,8 +23,6 @@ export async function getP2PConfig(guildId) {
 
 /**
  * Saves or updates P2P configuration for a guild.
- * @param {string} guildId 
- * @param {Partial<typeof DEFAULT_P2P_CONFIG>} newConfig 
  */
 export async function saveP2PConfig(guildId, newConfig) {
     if (!guildId) return;
@@ -38,12 +34,13 @@ export async function saveP2PConfig(guildId, newConfig) {
 }
 
 /**
- * Format currency string nicely.
+ * Format currency string nicely with comma separators.
  */
 function formatCurrency(amount, symbol = '$', label = 'USD') {
     const num = parseFloat(amount);
     if (isNaN(num)) return `${amount} ${label}`;
-    return `${symbol}${num.toFixed(2)} ${label}`;
+    const formatted = num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${symbol}${formatted} ${label}`;
 }
 
 /**
@@ -61,14 +58,15 @@ function formatTxHash(txHash) {
 }
 
 /**
- * Builds the P2P Deal Log Embed matching the reference screenshot design.
+ * Builds the P2P Deal Log Embed matching reference design.
  */
 export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate = null) {
     const title = config.titleText || 'Successful Transaction';
     const embedColor = config.embedColor || '#FFC107';
 
-    const usdVal = deal.usdAmount ? formatCurrency(deal.usdAmount, '$', 'USD') : `$${deal.usdtAmount}.00 USD`;
-    const usdtVal = `${deal.usdtAmount} USDT`;
+    const numUsdt = parseFloat(deal.usdtAmount) || 0;
+    const usdVal = deal.usdAmount ? formatCurrency(deal.usdAmount, '$', 'USD') : formatCurrency(numUsdt, '$', 'USD');
+    const usdtVal = `${numUsdt} USDT`;
 
     const txFormatted = formatTxHash(deal.txHash);
     const dealInfoText = deal.dealInfo || 'P2P USDT Transfer';
@@ -83,7 +81,8 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
         `> **Status:** \`${statusText}\``
     ].join('\n');
 
-    const timestampText = formattedDate || new Date().toLocaleString('en-US', {
+    const now = new Date();
+    const timestampText = formattedDate || now.toLocaleString('en-US', {
         day: '2-digit',
         month: '2-digit',
         year: '2-digit',
@@ -110,30 +109,29 @@ export function buildDealComponents(vouchChannelId, dealId) {
     const row = new ActionRowBuilder();
 
     // Vouch Channel Button / Link
-    if (vouchChannelId) {
-        row.addComponents(
-            new ButtonBuilder()
-                .setCustomId(`p2p_goto_vouch:${vouchChannelId}`)
-                .setLabel(`Check out #${vouchChannelId}`)
-                .setStyle(ButtonStyle.Secondary)
-                .setEmoji('📌')
-        );
-    }
+    const targetVouchLabel = vouchChannelId ? `Done reading? Check out #${vouchChannelId}` : 'Done reading? Check out #gws-vouches';
+    
+    row.addComponents(
+        new ButtonBuilder()
+            .setCustomId(`p2p_goto_vouch:${vouchChannelId || 'default'}`)
+            .setLabel(targetVouchLabel)
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('📌')
+    );
 
     // Submit Vouch Button
     row.addComponents(
         new ButtonBuilder()
             .setCustomId(`p2p_vouch_btn:${dealId}`)
-            .setLabel('Submit Vouch / Feedback')
+            .setLabel('⭐ Submit Vouch / Feedback')
             .setStyle(ButtonStyle.Primary)
-            .setEmoji('⭐')
     );
 
     return row;
 }
 
 /**
- * Logs a new P2P deal in the database and updates user stats.
+ * Logs a new P2P deal in database and updates stats.
  */
 export async function logDeal(guildId, dealData) {
     const dealsKey = getP2PDealsKey(guildId);
@@ -161,11 +159,9 @@ export async function logDeal(guildId, dealData) {
     deals.push(record);
     await setInDb(dealsKey, deals);
 
-    // Save individual deal key for direct lookup
     const singleDealKey = getP2PDealKey(guildId, dealId);
     await setInDb(singleDealKey, record);
 
-    // Update user stats for both Buyer and Seller
     await updateUserStats(guildId, dealData.buyerId, record);
     await updateUserStats(guildId, dealData.sellerId, record);
 
