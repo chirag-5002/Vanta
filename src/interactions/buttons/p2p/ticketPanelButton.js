@@ -1,5 +1,6 @@
-import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { wizardSelections } from '../../selectMenus/p2p/p2pWizardSelect.js';
+import { logger } from '../../../utils/logger.js';
 
 // ==================== STEP 1: Show Amount Modal ====================
 
@@ -150,6 +151,64 @@ export const sellNoKycButtonHandler = {
     }
 };
 
+// ==================== AUTO-LOG / COMPLETED TRANSACTION BUTTON ====================
+
+export const p2pAutologTicketButtonHandler = {
+    name: 'p2p_autolog_ticket_btn',
+    async execute(interaction, client, args) {
+        // Defer response ephemerally
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        try {
+            const { getP2PConfig, autoDetectAndPublishDeal } = await import('../../../services/p2pService.js');
+            const config = await getP2PConfig(interaction.guildId);
+
+            // Permission check: Only staff or admins can complete/log deals
+            const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
+            const hasStaffRole = config.staffRoleId ? interaction.member.roles.cache.has(config.staffRoleId) : false;
+
+            if (!hasManageGuild && !hasStaffRole) {
+                const requiredMsg = config.staffRoleId
+                    ? `You need the <@&${config.staffRoleId}> role or \`Manage Server\` permission to log deals.`
+                    : 'You need the `Manage Server` permission to log P2P deals.';
+                await interaction.replyUserError(interaction, { type: 'permission', message: requiredMsg });
+                return;
+            }
+
+            // Auto-detect deal details from channel messages & publish to deals channel
+            const dealRecord = await autoDetectAndPublishDeal(interaction.channel, interaction.guildId, interaction.user.id);
+            if (!dealRecord) {
+                await interaction.editReply({ content: '❌ Failed to auto-detect/publish deal. Ensure public deal channel is configured via `/p2p setup`.' });
+                return;
+            }
+
+            // Send "Transaction Successful" embed in the ticket channel
+            const successEmbed = new EmbedBuilder()
+                .setTitle('🎉 Transaction Successful!')
+                .setDescription(
+                    `The USDT P2P Transaction has been completed and verified.\n\n` +
+                    `> **Buyer:** <@${dealRecord.buyerId}>\n` +
+                    `> **Seller:** <@${dealRecord.sellerId}>\n` +
+                    `> **Amount:** \`${dealRecord.usdtAmount} USDT\`\n` +
+                    `> **Deal Info:** \`${dealRecord.dealInfo}\`\n\n` +
+                    `*🔒 This ticket can now be closed.*`
+                )
+                .setColor('#2ECC71')
+                .setFooter({ text: 'Vanta P2P Auto-MM • Transaction Complete' });
+
+            // Post transaction success message publicly in the ticket channel (non-ephemeral)
+            await interaction.channel.send({ embeds: [successEmbed] });
+
+            // Reply to the staff interaction
+            await interaction.editReply({ content: '✅ Deal details auto-detected and transaction proof posted successfully!' });
+
+        } catch (err) {
+            logger.error('Failed to complete/autolog deal via button:', err);
+            await interaction.editReply({ content: `❌ Failed to log deal: ${err.message}` });
+        }
+    }
+};
+
 export default [
     buyPriceButtonHandler,
     sellPriceButtonHandler,
@@ -159,4 +218,5 @@ export default [
     sellNoKycButtonHandler,
     wizardProceedButtonHandler,
     wizardCancelButtonHandler,
+    p2pAutologTicketButtonHandler,
 ];

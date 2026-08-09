@@ -1,4 +1,4 @@
-import { Events } from 'discord.js';
+import { Events, EmbedBuilder } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
@@ -39,12 +39,55 @@ export default {
 
       await handleAutoP2PKeyword(message);
 
+      await handleReceiptUpload(message, client);
+
       await handleLeveling(message, client);
     } catch (error) {
       logger.error('Error in messageCreate event:', error);
     }
   }
 };
+
+async function handleReceiptUpload(message, client) {
+  try {
+    const channelName = message.channel?.name?.toLowerCase() || '';
+    if (!channelName.includes('ticket') && !channelName.includes('p2p')) return;
+
+    // Check if the message has image attachments
+    const hasImageAttachment = message.attachments.some(att => 
+      att.contentType?.startsWith('image/') || 
+      att.name?.match(/\.(png|jpe?g|webp|gif)$/i)
+    );
+    if (!hasImageAttachment) return;
+
+    // Get ticket data to check if this is the ticket creator
+    const { getTicketData } = await import('../utils/database.js');
+    const ticketData = await getTicketData(message.guild.id, message.channel.id);
+    if (!ticketData || ticketData.userId !== message.author.id) return;
+
+    // Prevent duplicate receipt messages (one per ticket)
+    const { getFromDb, setInDb } = await import('../utils/database.js');
+    const dbKey = `guild:${message.guild.id}:ticket:${message.channel.id}:receipt_received`;
+    const alreadySent = await getFromDb(dbKey, false);
+    if (alreadySent) return;
+
+    await setInDb(dbKey, true);
+
+    const embed = new EmbedBuilder()
+      .setTitle('📥 Payment Receipt Received')
+      .setDescription(
+        `Thank you for uploading your payment screenshot. Our team will verify your payment shortly.\n\n` +
+        `> **Verification Status:** \`Pending Verification\`\n` +
+        `> **Estimated Time:** \`Up to 1 hour (max)\` to complete the transaction.`
+      )
+      .setColor('#FFC107')
+      .setFooter({ text: 'Vanta P2P Auto-MM • Keep chats inside this channel' });
+
+    await message.channel.send({ embeds: [embed] });
+  } catch (err) {
+    logger.debug('Receipt Upload Listener skipped:', err.message);
+  }
+}
 
 async function handleAutoP2PKeyword(message) {
   try {
