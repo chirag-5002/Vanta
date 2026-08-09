@@ -380,6 +380,15 @@ export async function autoDetectDealFromChannel(channel, guildId) {
  * Automatically scans a ticket channel, logs the deal, and posts the permanent embed.
  */
 export async function autoDetectAndPublishDeal(channel, guildId, executorId = null) {
+    // Prevent duplicate logs using client memory
+    if (!channel.client.loggedDeals) {
+        channel.client.loggedDeals = new Set();
+    }
+    if (channel.client.loggedDeals.has(channel.id)) {
+        return null;
+    }
+    channel.client.loggedDeals.add(channel.id);
+
     const config = await getP2PConfig(guildId);
     
     const detected = await autoDetectDealFromChannel(channel, guildId);
@@ -433,8 +442,11 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
     const dealInfoText = deal.dealInfo || 'P2P USDT Transfer';
     const statusText = deal.status || 'Completed';
 
-    const buyerMention = `<@${deal.buyerId}>`;
-    const sellerMention = `<@${deal.sellerId}>`;
+    const botId = guild?.client?.user?.id;
+
+    // Show bot as mention (e.g. @Vanta) and human trader as raw ID in code block (e.g. `123456789`)
+    const buyerMention = (deal.buyerId === 'server' || deal.buyerId === botId) ? `<@${botId}>` : `\`${deal.buyerId}\``;
+    const sellerMention = (deal.sellerId === 'server' || deal.sellerId === botId) ? `<@${botId}>` : `\`${deal.sellerId}\``;
 
     const description = [
         `> **Between:** ${buyerMention} and ${sellerMention}`,
