@@ -35,7 +35,7 @@ export const p2pTradeButtonHandler = {
             // 3. Network
             const q3Network = new TextInputBuilder()
                 .setCustomId('q3_network')
-                .setLabel('3. Crypto Network (USDT TRC20, ERC20, BEP20, etc)')
+                .setLabel('3. Crypto Network (TRC20/ERC20/BEP20)')
                 .setPlaceholder('Type: TRC20 / ERC20 / BEP20 / USDC')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
@@ -77,7 +77,7 @@ export const p2pTradeButtonHandler = {
             // 3. Details
             const q3Details = new TextInputBuilder()
                 .setCustomId('q3_details')
-                .setLabel('3. Payout Details (UPI ID / Bank Acc & IFSC)')
+                .setLabel('3. Payout Details (UPI ID / Bank Info)')
                 .setPlaceholder('Enter your UPI ID or Bank Account Details')
                 .setStyle(TextInputStyle.Paragraph)
                 .setRequired(true);
@@ -85,7 +85,7 @@ export const p2pTradeButtonHandler = {
             // 4. Network
             const q4Network = new TextInputBuilder()
                 .setCustomId('q4_network')
-                .setLabel('4. Deposit Crypto Network (TRC20, ERC20, BEP20)')
+                .setLabel('4. Deposit Network (TRC20/ERC20/BEP20)')
                 .setPlaceholder('Type: TRC20 / ERC20 / BEP20 / USDC')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
