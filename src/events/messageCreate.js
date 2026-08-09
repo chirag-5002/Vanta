@@ -60,10 +60,9 @@ async function handleReceiptUpload(message, client) {
     const { getTicketData } = await import('../utils/database.js');
     const ticketData = await getTicketData(message.guild.id, message.channel.id).catch(() => null);
 
-    // Hybrid check: DB record OR check if they have a specific user permission overwrite (excluding owner & bot)
+    // Hybrid check: DB record OR check if they have a specific user permission overwrite (excluding the bot itself)
     const isCreator = (ticketData && ticketData.userId === message.author.id) ||
                       (message.channel.permissionOverwrites.cache.has(message.author.id) &&
-                       message.author.id !== message.guild.ownerId &&
                        message.author.id !== client.user.id);
 
     if (!isCreator) return;

@@ -119,10 +119,6 @@ export const p2pDetailsModalHandler = {
                     deny: [PermissionFlagsBits.ViewChannel]
                 },
                 {
-                    id: interaction.guild.ownerId,
-                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles]
-                },
-                {
                     id: interaction.user.id,
                     allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles]
                 },
