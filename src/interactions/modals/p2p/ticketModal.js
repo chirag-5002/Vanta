@@ -3,6 +3,7 @@ import { createTicket } from '../../../services/ticket.js';
 import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed } from '../../../services/p2pService.js';
 import { logger } from '../../../utils/logger.js';
 import { errorEmbed } from '../../../utils/embeds.js';
+import { wizardSelections } from '../../selectMenus/p2p/p2pWizardSelect.js';
 
 function safeGetField(fields, ...keys) {
     if (!fields) return null;
@@ -32,19 +33,26 @@ export const p2pWizardModalHandler = {
             const config = await getP2PConfig(interaction.guildId);
             const paymentConfig = await getP2PPaymentConfig(interaction.guildId);
 
-            // Resilient field extractions (supports old & new modal field names)
+            // Get amount from modal
             const amountDisplay = safeGetField(interaction.fields, 'q1_amount', 'amount') || '100';
-            const paymentMethod = (safeGetField(interaction.fields, 'q2_payment', 'payment') || 'UPI').toUpperCase();
-            let networkLabel = 'USDT TRC20';
-            let addressDisplay = 'N/A';
 
+            // Get payment method and network from wizard selections (dropdowns)
+            const key = `${interaction.guildId}:${interaction.user.id}`;
+            const selections = wizardSelections.get(key) || {};
+
+            const paymentMethod = (selections.paymentMethod || safeGetField(interaction.fields, 'q2_payment', 'payment') || 'UPI').toUpperCase();
+            const networkRaw = selections.network || safeGetField(interaction.fields, 'q3_network', 'q4_network', 'network') || 'USDT_TRC20';
+            const networkLabel = networkRaw.replace(/_/g, ' ').toUpperCase();
+
+            let addressDisplay = 'N/A';
             if (isBuy) {
-                networkLabel = (safeGetField(interaction.fields, 'q3_network', 'network') || 'USDT TRC20').toUpperCase();
                 addressDisplay = safeGetField(interaction.fields, 'q4_address', 'address') || 'N/A';
             } else {
                 addressDisplay = safeGetField(interaction.fields, 'q3_details', 'address') || 'N/A';
-                networkLabel = (safeGetField(interaction.fields, 'q4_network', 'network') || 'USDT TRC20').toUpperCase();
             }
+
+            // Clean up wizard selections
+            wizardSelections.delete(key);
 
             const reason = `${isBuy ? 'Buy' : 'Sell'} ${amountDisplay} USDT via ${paymentMethod} (${networkLabel})`;
 

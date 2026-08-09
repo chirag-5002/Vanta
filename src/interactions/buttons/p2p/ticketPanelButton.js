@@ -1,106 +1,177 @@
-import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
+import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
+import { wizardSelections } from '../../selectMenus/p2p/p2pWizardSelect.js';
+
+/**
+ * Build the ephemeral wizard message with dropdown select menus.
+ * Step 1: User selects Payment Method + Network from dropdowns
+ * Step 2: User clicks "Proceed" → Modal opens for Amount + Address/Details
+ */
+function buildWizardMessage(tradeType, kycType) {
+    const isBuy = tradeType === 'buy';
+    const isKyc = kycType === 'kyc';
+
+    const embed = new EmbedBuilder()
+        .setTitle(`${isBuy ? '🛒 Buy USDT' : '🔴 Sell USDT'} — Trade Wizard`)
+        .setDescription(
+            `**Step 1 of 2** — Select your options below:\n\n` +
+            `> 1️⃣ Choose your **${isBuy ? 'Payment' : 'Payout'} Method**\n` +
+            `> 2️⃣ Choose your **Crypto Network**\n` +
+            `> 3️⃣ Click **Proceed** to enter amount & ${isBuy ? 'wallet address' : 'payout details'}\n\n` +
+            `*${isKyc ? '🔒 KYC Verified Trade' : '⚡ Non-KYC Quick Trade'}*`
+        )
+        .setColor(isBuy ? '#2ECC71' : '#E74C3C')
+        .setFooter({ text: 'Vanta P2P • Select both options then click Proceed' });
+
+    // Payment Method dropdown
+    const paymentOptions = isBuy
+        ? [
+            { label: 'UPI', value: 'UPI', emoji: '📱' },
+            { label: 'IMPS', value: 'IMPS', emoji: '🏦' },
+            { label: 'CDM (Cash Deposit Machine)', value: 'CDM', emoji: '🏧' },
+            { label: 'CCW (Crypto-to-Crypto Swap)', value: 'CCW', emoji: '🔄' },
+        ]
+        : [
+            { label: 'UPI', value: 'UPI', emoji: '📱' },
+            { label: 'IMPS', value: 'IMPS', emoji: '🏦' },
+        ];
+
+    const paymentMenu = new StringSelectMenuBuilder()
+        .setCustomId(`p2p_select_payment:${tradeType}:${kycType}`)
+        .setPlaceholder(`Select ${isBuy ? 'Payment' : 'Payout'} Method`)
+        .addOptions(paymentOptions);
+
+    // Network dropdown
+    const networkMenu = new StringSelectMenuBuilder()
+        .setCustomId(`p2p_select_network:${tradeType}:${kycType}`)
+        .setPlaceholder('Select Crypto Network')
+        .addOptions([
+            { label: 'USDT TRC20', value: 'USDT_TRC20', emoji: '🟢' },
+            { label: 'USDT ERC20', value: 'USDT_ERC20', emoji: '🔵' },
+            { label: 'USDT BEP20', value: 'USDT_BEP20', emoji: '🟡' },
+        ]);
+
+    // Proceed button
+    const proceedButton = new ButtonBuilder()
+        .setCustomId(`p2p_wizard_proceed:${tradeType}:${kycType}`)
+        .setLabel('✅ Proceed')
+        .setStyle(ButtonStyle.Success);
+
+    const cancelButton = new ButtonBuilder()
+        .setCustomId(`p2p_wizard_cancel`)
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Secondary);
+
+    return {
+        embeds: [embed],
+        components: [
+            new ActionRowBuilder().addComponents(paymentMenu),
+            new ActionRowBuilder().addComponents(networkMenu),
+            new ActionRowBuilder().addComponents(proceedButton, cancelButton),
+        ],
+        flags: MessageFlags.Ephemeral,
+    };
+}
+
+// ==================== MAIN HANDLER ====================
 
 export const p2pTradeButtonHandler = {
     name: 'p2p_trade_btn',
     async execute(interaction, client, args) {
-        const tradeType = args[0] || 'buy'; // 'buy' or 'sell'
-        const kycType = args[1] || 'kyc';   // 'kyc' or 'nokyc'
+        const tradeType = args[0] || 'buy';
+        const kycType = args[1] || 'kyc';
 
+        // Clear any previous wizard state for this user
+        const key = `${interaction.guildId}:${interaction.user.id}`;
+        wizardSelections.delete(key);
+
+        const message = buildWizardMessage(tradeType, kycType);
+        await interaction.reply(message);
+    }
+};
+
+// ==================== PROCEED BUTTON (shows modal for remaining fields) ====================
+
+export const wizardProceedButtonHandler = {
+    name: 'p2p_wizard_proceed',
+    async execute(interaction, client, args) {
+        const tradeType = args[0] || 'buy';
+        const kycType = args[1] || 'kyc';
         const isBuy = tradeType === 'buy';
-        const isKyc = kycType === 'kyc';
 
+        const key = `${interaction.guildId}:${interaction.user.id}`;
+        const selections = wizardSelections.get(key) || {};
+
+        // Validate both dropdowns were selected
+        if (!selections.paymentMethod || !selections.network) {
+            const missing = [];
+            if (!selections.paymentMethod) missing.push('**Payment Method**');
+            if (!selections.network) missing.push('**Crypto Network**');
+            await interaction.reply({
+                content: `⚠️ Please select ${missing.join(' and ')} from the dropdowns above before proceeding.`,
+                flags: MessageFlags.Ephemeral,
+            });
+            return;
+        }
+
+        // Show modal for remaining fields (Amount + Address/Details)
         const modal = new ModalBuilder()
             .setCustomId(`p2p_wizard_modal:${tradeType}:${kycType}`)
-            .setTitle(`${isBuy ? '🛒 Buy USDT' : '🔴 Sell USDT'} (${isKyc ? 'KYC Verified' : 'Non-KYC'})`);
+            .setTitle(`${isBuy ? '🛒 Buy USDT' : '🔴 Sell USDT'} — Details`);
+
+        const q1Amount = new TextInputBuilder()
+            .setCustomId('q1_amount')
+            .setLabel(`How much USDT do you want to ${isBuy ? 'BUY' : 'SELL'}?`)
+            .setPlaceholder('e.g. 100, 500, or 2500')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
 
         if (isBuy) {
-            // ==================== BUY MODAL (EXACT ORDER: 1. Amount -> 2. Payment Method -> 3. Network -> 4. Wallet Address) ====================
-            
-            // 1. Amount
-            const q1Amount = new TextInputBuilder()
-                .setCustomId('q1_amount')
-                .setLabel('1. How much USDT do you want to BUY?')
-                .setPlaceholder('e.g. 100, 500, or 2500')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            // 2. Payment Method
-            const q2Payment = new TextInputBuilder()
-                .setCustomId('q2_payment')
-                .setLabel('2. Payment Method (UPI, IMPS, CDM, or CCW)')
-                .setPlaceholder('Type: UPI / IMPS / CDM / CCW')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            // 3. Network
-            const q3Network = new TextInputBuilder()
-                .setCustomId('q3_network')
-                .setLabel('3. Crypto Network (TRC20/ERC20/BEP20)')
-                .setPlaceholder('Type: TRC20 / ERC20 / BEP20 / USDC')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            // 4. Wallet Address
-            const q4Address = new TextInputBuilder()
+            const q2Address = new TextInputBuilder()
                 .setCustomId('q4_address')
-                .setLabel('4. Your Receiving Wallet Address')
-                .setPlaceholder('Enter your TRC20 / ERC20 Wallet Address')
+                .setLabel('Your Receiving Wallet Address')
+                .setPlaceholder('Enter your TRC20 / ERC20 / BEP20 Wallet Address')
                 .setStyle(TextInputStyle.Paragraph)
                 .setRequired(true);
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(q1Amount),
-                new ActionRowBuilder().addComponents(q2Payment),
-                new ActionRowBuilder().addComponents(q3Network),
-                new ActionRowBuilder().addComponents(q4Address)
+                new ActionRowBuilder().addComponents(q2Address)
             );
-
         } else {
-            // ==================== SELL MODAL (EXACT ORDER: 1. Amount -> 2. Payment Method -> 3. Payout Details -> 4. Network) ====================
-            
-            // 1. Amount
-            const q1Amount = new TextInputBuilder()
-                .setCustomId('q1_amount')
-                .setLabel('1. How much USDT do you want to SELL?')
-                .setPlaceholder('e.g. 100, 500, or 2500')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            // 2. Payment Method
-            const q2Payment = new TextInputBuilder()
-                .setCustomId('q2_payment')
-                .setLabel('2. Payout Method (UPI or IMPS)')
-                .setPlaceholder('Type: UPI / IMPS')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            // 3. Details
-            const q3Details = new TextInputBuilder()
+            const q2Details = new TextInputBuilder()
                 .setCustomId('q3_details')
-                .setLabel('3. Payout Details (UPI ID / Bank Info)')
-                .setPlaceholder('Enter your UPI ID or Bank Account Details')
+                .setLabel('Payout Details (UPI ID / Bank Info)')
+                .setPlaceholder('Enter your UPI ID or Bank Account + IFSC Details')
                 .setStyle(TextInputStyle.Paragraph)
-                .setRequired(true);
-
-            // 4. Network
-            const q4Network = new TextInputBuilder()
-                .setCustomId('q4_network')
-                .setLabel('4. Deposit Network (TRC20/ERC20/BEP20)')
-                .setPlaceholder('Type: TRC20 / ERC20 / BEP20 / USDC')
-                .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(q1Amount),
-                new ActionRowBuilder().addComponents(q2Payment),
-                new ActionRowBuilder().addComponents(q3Details),
-                new ActionRowBuilder().addComponents(q4Network)
+                new ActionRowBuilder().addComponents(q2Details)
             );
         }
 
         await interaction.showModal(modal);
     }
 };
+
+// ==================== CANCEL BUTTON ====================
+
+export const wizardCancelButtonHandler = {
+    name: 'p2p_wizard_cancel',
+    async execute(interaction, client, args) {
+        const key = `${interaction.guildId}:${interaction.user.id}`;
+        wizardSelections.delete(key);
+
+        await interaction.update({
+            content: '❌ Trade wizard cancelled.',
+            embeds: [],
+            components: [],
+        });
+    }
+};
+
+// ==================== PANEL BUTTON ALIASES ====================
 
 export const buyPriceButtonHandler = {
     name: 'p2p_price_buy',
@@ -150,5 +221,7 @@ export default [
     buyKycButtonHandler,
     buyNoKycButtonHandler,
     sellKycButtonHandler,
-    sellNoKycButtonHandler
+    sellNoKycButtonHandler,
+    wizardProceedButtonHandler,
+    wizardCancelButtonHandler,
 ];
