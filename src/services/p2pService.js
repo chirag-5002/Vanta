@@ -578,14 +578,19 @@ export function buildPriceUpdateEmbed(priceData, guildName = 'Vanta Network') {
     const formattedSell = `${symbol} ${sellNum.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}`;
 
     const description = [
-        `**${guildName}** has updated the real-time P2P exchange rates.\n`,
-        `🟢 **Buy Price:** \`${formattedBuy}\`    |    🔴 **Sell Price:** \`${formattedSell}\``
+        `**${guildName}** has updated the real-time P2P exchange rates.`,
+        `Select an option below to be redirected to the secure portal channels where you can request a Buy or Sell ticket.\n`,
+        `*🛡️ All deals are fully secured by Vanta Automated Escrow System.*`
     ].join('\n');
 
     const embed = new EmbedBuilder()
         .setTitle('📈 USDT Market Price Update')
         .setDescription(description)
-        .setColor('#FFC107');
+        .setColor('#FFC107')
+        .addFields(
+            { name: '🟢 Buy Price', value: `\`\`\`\n${formattedBuy}\n\`\`\``, inline: true },
+            { name: '🔴 Sell Price', value: `\`\`\`\n${formattedSell}\n\`\`\``, inline: true }
+        );
 
     const now = new Date();
     const timestampStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
