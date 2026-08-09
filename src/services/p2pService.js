@@ -290,11 +290,21 @@ export async function autoDetectDealFromChannel(channel, guildId) {
     let usdtAmount = null;
     let txHash = null;
     let dealInfo = null;
+    let isSell = false;
+    let userCreatorId = null;
 
     try {
-        const ticketData = await getTicketData(guildId, channel.id);
-        if (ticketData?.userId) {
-            buyerId = ticketData.userId;
+        const ticketData = await getTicketData(guildId, channel.id).catch(() => null);
+        if (ticketData) {
+            userCreatorId = ticketData.userId;
+            const reason = ticketData.reason || '';
+            isSell = reason.toLowerCase().includes('sell');
+            
+            // Extract exact amount from ticket reason
+            const amountMatch = reason.match(/(Buy|Sell)\s+(\d+(\.\d+)?)\s+USDT/i);
+            if (amountMatch) {
+                usdtAmount = parseFloat(amountMatch[2]);
+            }
         }
 
         const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
@@ -313,11 +323,8 @@ export async function autoDetectDealFromChannel(channel, guildId) {
             }
 
             const humanList = Array.from(humanMentionIds);
-            if (!buyerId && humanList.length > 0) {
-                buyerId = humanList[0];
-            }
-            if (humanList.length > 1) {
-                sellerId = humanList.find(id => id !== buyerId) || humanList[1];
+            if (!userCreatorId && humanList.length > 0) {
+                userCreatorId = humanList[0];
             }
 
             const txRegex = /(0x[a-fA-F0-9]{40,66})|(https?:\/\/(bscscan|etherscan|tronscan|solscan)[^\s]+)/i;
@@ -355,13 +362,16 @@ export async function autoDetectDealFromChannel(channel, guildId) {
         logger.error('Error auto-detecting deal info from channel:', { error: err.message, channelId: channel.id });
     }
 
+    buyerId = isSell ? 'server' : userCreatorId;
+    sellerId = isSell ? userCreatorId : 'server';
+
     return {
         buyerId,
         sellerId,
         usdtAmount: usdtAmount || 100,
         usdAmount: usdtAmount || 100,
         txHash: txHash || null,
-        dealInfo: dealInfo || 'P2P USDT Deal'
+        dealInfo: dealInfo || (isSell ? 'Sell USDT Deal' : 'Buy USDT Deal')
     };
 }
 
@@ -379,8 +389,8 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
 
     if (!targetChannel) return null;
 
-    const buyerId = detected.buyerId || executorId || channel.client?.user?.id;
-    const sellerId = detected.sellerId || executorId || channel.client?.user?.id;
+    const buyerId = detected.buyerId;
+    const sellerId = detected.sellerId;
 
     const dealRecord = await logDeal(guildId, {
         buyerId,
@@ -390,10 +400,10 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
         txHash: detected.txHash,
         dealInfo: detected.dealInfo,
         status: 'Completed',
-        loggedBy: executorId || buyerId
+        loggedBy: executorId || (buyerId === 'server' ? sellerId : buyerId)
     });
 
-    const dealEmbed = buildDealEmbed(dealRecord, config);
+    const dealEmbed = buildDealEmbed(dealRecord, config, null, channel.guild);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
     const sentMsg = await targetChannel.send({
@@ -410,7 +420,7 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
 /**
  * Builds the P2P Deal Log Embed matching reference design.
  */
-export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate = null) {
+export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate = null, guild = null) {
     const title = config.titleText || 'Successful Transaction';
     const embedColor = config.embedColor || '#FFC107';
 
@@ -422,8 +432,13 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
     const dealInfoText = deal.dealInfo || 'P2P USDT Transfer';
     const statusText = deal.status || 'Completed';
 
+    const guildName = guild ? guild.name : 'Server';
+
+    const buyerMention = deal.buyerId === 'server' ? `**${guildName}**` : `<@${deal.buyerId}>`;
+    const sellerMention = deal.sellerId === 'server' ? `**${guildName}**` : `<@${deal.sellerId}>`;
+
     const description = [
-        `> **Between:** <@${deal.buyerId}> and <@${deal.sellerId}>`,
+        `> **Between:** ${buyerMention} and ${sellerMention}`,
         `> **Amount:** ≈ ${usdVal} / ${usdtVal}`,
         `> **Tx:** ${txFormatted}`,
         `> **Deal Info:** ${dealInfoText}`,
@@ -581,7 +596,7 @@ export async function logDeal(guildId, dealData) {
  * Updates P2P deal stats for a user.
  */
 async function updateUserStats(guildId, userId, dealRecord) {
-    if (!userId) return;
+    if (!userId || userId === 'server') return;
     const userStatsKey = getP2PUserStatsKey(guildId, userId);
     const current = await getFromDb(userStatsKey, {
         totalDeals: 0,

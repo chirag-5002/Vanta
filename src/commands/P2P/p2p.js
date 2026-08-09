@@ -546,7 +546,7 @@ async function handleAutoLog(interaction) {
         loggedBy: interaction.user.id
     });
 
-    const dealEmbed = buildDealEmbed(dealRecord, config);
+    const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
     if (targetChannel && targetChannel.id !== interaction.channel?.id) {
@@ -683,7 +683,7 @@ async function handleDeal(interaction) {
         loggedBy: interaction.user.id
     });
 
-    const dealEmbed = buildDealEmbed(dealRecord, config);
+    const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
     if (targetChannel.id !== interaction.channel?.id) {

@@ -182,19 +182,10 @@ export const p2pAutologTicketButtonHandler = {
                 return;
             }
 
-            // Send "Transaction Successful" embed in the ticket channel
+            // Send simple "Transaction Complete" embed in the ticket channel (no details)
             const successEmbed = new EmbedBuilder()
-                .setTitle('🎉 Transaction Successful!')
-                .setDescription(
-                    `The USDT P2P Transaction has been completed and verified.\n\n` +
-                    `> **Buyer:** <@${dealRecord.buyerId}>\n` +
-                    `> **Seller:** <@${dealRecord.sellerId}>\n` +
-                    `> **Amount:** \`${dealRecord.usdtAmount} USDT\`\n` +
-                    `> **Deal Info:** \`${dealRecord.dealInfo}\`\n\n` +
-                    `*🔒 This ticket can now be closed.*`
-                )
-                .setColor('#2ECC71')
-                .setFooter({ text: 'Vanta P2P Auto-MM • Transaction Complete' });
+                .setTitle('🎉 Transaction Complete')
+                .setColor('#2ECC71');
 
             // Post transaction success message publicly in the ticket channel (non-ephemeral)
             await interaction.channel.send({ embeds: [successEmbed] });
