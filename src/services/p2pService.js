@@ -276,6 +276,55 @@ export async function autoDeployP2PPanels(guild) {
             }
         }
 
+        // Combined live price/portal channel auto-deployer
+        const config = await getP2PConfig(guild.id).catch(() => null);
+        const priceChannel = channels.find(c => c && c.isTextBased() && (
+            (config && c.id === config.priceChannelId) || c.name.includes('usdt-price') || c.name === 'price'
+        ));
+
+        if (priceChannel) {
+            const msgs = await priceChannel.messages.fetch({ limit: 10 }).catch(() => null);
+            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_price_buy')));
+
+            if (!botHasNewPanel) {
+                if (msgs) {
+                    const oldPanels = msgs.filter(m => m.author.id === guild.client.user.id);
+                    for (const m of oldPanels.values()) {
+                        await m.delete().catch(() => null);
+                    }
+                }
+
+                const portalEmbed = new EmbedBuilder()
+                    .setTitle('⚡ USDT Live Market & P2P Portal')
+                    .setDescription(
+                        `Welcome to **${guild.name}** P2P Trading Hub!\n\n` +
+                        `Select an option below to start a secure 1-on-1 Middleman Trade Ticket:\n\n` +
+                        `• **🟢 Buy USDT:** Click to start a trade request to buy USDT.\n` +
+                        `• **🔴 Sell USDT:** Click to start a trade request to sell USDT.\n\n` +
+                        `*🛡️ All deals are fully secured by Vanta Automated Escrow System.*`
+                    )
+                    .setColor('#FFC107')
+                    .setFooter({ text: `${guild.name} • Official P2P Hub` });
+
+                const portalRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('p2p_price_buy')
+                        .setLabel('🟢 Buy USDT')
+                        .setStyle(ButtonStyle.Success),
+                    new ButtonBuilder()
+                        .setCustomId('p2p_price_sell')
+                        .setLabel('🔴 Sell USDT')
+                        .setStyle(ButtonStyle.Danger),
+                    new ButtonBuilder()
+                        .setCustomId(`p2p_goto_vouch:${(config && config.vouchChannelId) || 'default'}`)
+                        .setLabel('⭐ View Vouches')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+
+                await priceChannel.send({ embeds: [portalEmbed], components: [portalRow] }).catch(() => null);
+            }
+        }
+
     } catch (err) {
         logger.error('Error in autoDeployP2PPanels:', err.message);
     }

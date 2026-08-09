@@ -1,4 +1,4 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, MessageFlags, ChannelType } from 'discord.js';
 import { createTicket } from '../../../services/ticket.js';
 import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed } from '../../../services/p2pService.js';
 import { logger } from '../../../utils/logger.js';
@@ -100,11 +100,20 @@ export const p2pDetailsModalHandler = {
 
             const reason = `${isBuy ? 'Buy' : 'Sell'} ${amountDisplay} USDT via ${paymentMethod} (${networkLabel})`;
 
+            // Dynamically detect marketplace category
+            const marketCategory = interaction.guild.channels.cache.find(c => 
+                c.type === ChannelType.GuildCategory && 
+                (c.name.toLowerCase().includes('market place') || 
+                 c.name.toLowerCase().includes('marketplace') || 
+                 c.name.toLowerCase().includes('p2p'))
+            );
+            const targetCategoryId = marketCategory ? marketCategory.id : null;
+
             // 1. Create Private Ticket Channel
             const result = await createTicket(
                 interaction.guild,
                 interaction.member,
-                null,
+                targetCategoryId,
                 reason,
                 'none'
             );
