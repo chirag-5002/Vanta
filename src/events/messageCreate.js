@@ -1,4 +1,4 @@
-import { Events, EmbedBuilder } from 'discord.js';
+import { Events, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
@@ -53,25 +53,27 @@ async function handleReceiptUpload(message, client) {
     const channelName = message.channel?.name?.toLowerCase() || '';
     if (!channelName.includes('ticket') && !channelName.includes('p2p')) return;
 
-    // Check if the message has image attachments
-    const hasImageAttachment = message.attachments.some(att => 
-      att.contentType?.startsWith('image/') || 
-      att.name?.match(/\.(png|jpe?g|webp|gif)$/i)
-    );
-    if (!hasImageAttachment) return;
+    // Check if the message has any attachments
+    if (!message.attachments || message.attachments.size === 0) return;
 
-    // Get ticket data to check if this is the ticket creator
-    const { getTicketData } = await import('../utils/database.js');
-    const ticketData = await getTicketData(message.guild.id, message.channel.id);
-    if (!ticketData || ticketData.userId !== message.author.id) return;
+    // Get P2P config to check for staff roles
+    const { getP2PConfig } = await import('../services/p2pService.js');
+    const config = await getP2PConfig(message.guild.id);
 
-    // Prevent duplicate receipt messages (one per ticket)
-    const { getFromDb, setInDb } = await import('../utils/database.js');
-    const dbKey = `guild:${message.guild.id}:ticket:${message.channel.id}:receipt_received`;
-    const alreadySent = await getFromDb(dbKey, false);
-    if (alreadySent) return;
+    // Verify if the sender is staff or admin. If they are, skip this (since only the client uploads the payment screenshot).
+    const staffRoleId = config.staffRoleId;
+    const isStaffOrAdmin = message.member.permissions.has(PermissionFlagsBits.ManageGuild) || 
+                           message.member.permissions.has(PermissionFlagsBits.Administrator) ||
+                           (staffRoleId && message.member.roles.cache.has(staffRoleId));
+    if (isStaffOrAdmin) return;
 
-    await setInDb(dbKey, true);
+    // Prevent duplicate receipt messages (one per ticket) using transient client memory
+    if (!client.p2pReceipts) {
+      client.p2pReceipts = new Set();
+    }
+    
+    if (client.p2pReceipts.has(message.channel.id)) return;
+    client.p2pReceipts.add(message.channel.id);
 
     const embed = new EmbedBuilder()
       .setTitle('📥 Payment Receipt Received')
