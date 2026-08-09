@@ -473,7 +473,14 @@ async function handlePriceUpdate(interaction) {
         paymentMethods
     }, interaction.guild.name || 'Vanta Network');
 
-    const componentsRow = buildPriceComponents(config.vouchChannelId);
+    const { resolveP2PChannels } = await import('../../services/p2pService.js');
+    const p2pChannels = resolveP2PChannels(interaction.guild);
+    const componentsRow = buildPriceComponents(
+        config.vouchChannelId,
+        interaction.guildId,
+        p2pChannels.buyChannelId,
+        p2pChannels.sellChannelId
+    );
 
     let contentPayload = {};
     if (pingOption === '@everyone') {

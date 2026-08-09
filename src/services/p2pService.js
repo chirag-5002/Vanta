@@ -284,7 +284,12 @@ export async function autoDeployP2PPanels(guild) {
 
         if (priceChannel) {
             const msgs = await priceChannel.messages.fetch({ limit: 10 }).catch(() => null);
-            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_price_buy')));
+            
+            // Check if there is already a link-button portal deployed by Vanta
+            const botHasNewPanel = msgs && msgs.some(m => 
+                m.author.id === guild.client.user.id && 
+                m.components.some(row => row.components.some(b => b.style === ButtonStyle.Link))
+            );
 
             if (!botHasNewPanel) {
                 if (msgs) {
@@ -295,30 +300,21 @@ export async function autoDeployP2PPanels(guild) {
                 }
 
                 const portalEmbed = new EmbedBuilder()
-                    .setTitle('⚡ USDT Live Market & P2P Portal')
+                    .setTitle('⚡ USDT P2P Portal')
                     .setDescription(
                         `Welcome to **${guild.name}** P2P Trading Hub!\n\n` +
-                        `Select an option below to start a secure 1-on-1 Middleman Trade Ticket:\n\n` +
-                        `• **🟢 Buy USDT:** Click to start a trade request to buy USDT.\n` +
-                        `• **🔴 Sell USDT:** Click to start a trade request to sell USDT.\n\n` +
+                        `🟢 **Buy USDT**    |    🔴 **Sell USDT**\n\n` +
                         `*🛡️ All deals are fully secured by Vanta Automated Escrow System.*`
                     )
                     .setColor('#FFC107')
                     .setFooter({ text: `${guild.name} • Official P2P Hub` });
 
-                const portalRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('p2p_price_buy')
-                        .setLabel('🟢 Buy USDT')
-                        .setStyle(ButtonStyle.Success),
-                    new ButtonBuilder()
-                        .setCustomId('p2p_price_sell')
-                        .setLabel('🔴 Sell USDT')
-                        .setStyle(ButtonStyle.Danger),
-                    new ButtonBuilder()
-                        .setCustomId(`p2p_goto_vouch:${(config && config.vouchChannelId) || 'default'}`)
-                        .setLabel('⭐ View Vouches')
-                        .setStyle(ButtonStyle.Secondary)
+                const p2pChannels = resolveP2PChannels(guild);
+                const portalRow = buildPriceComponents(
+                    config?.vouchChannelId, 
+                    guild.id, 
+                    p2pChannels.buyChannelId, 
+                    p2pChannels.sellChannelId
                 );
 
                 await priceChannel.send({ embeds: [portalEmbed], components: [portalRow] }).catch(() => null);
@@ -553,6 +549,24 @@ export function buildDealComponents(vouchChannelId, dealId) {
 }
 
 /**
+ * Helper to dynamically resolve P2P Buy and Sell channel IDs from a guild.
+ */
+export function resolveP2PChannels(guild) {
+    if (!guild || !guild.channels) return { buyChannelId: null, sellChannelId: null };
+    const channels = guild.channels.cache;
+    const buyChannel = channels.find(c => c && c.isTextBased() && (
+        c.name.includes('looking-to-buy') || c.name.includes('buy-usdt') || c.name === 'buy'
+    ));
+    const sellChannel = channels.find(c => c && c.isTextBased() && (
+        c.name.includes('looking-to-sell') || c.name.includes('sell-usdt') || c.name === 'sell'
+    ));
+    return {
+        buyChannelId: buyChannel ? buyChannel.id : null,
+        sellChannelId: sellChannel ? sellChannel.id : null
+    };
+}
+
+/**
  * Builds the Ultra-Professional USDT Market Price Update Embed matching reference design.
  */
 export function buildPriceUpdateEmbed(priceData, guildName = 'Vanta Network') {
@@ -562,25 +576,16 @@ export function buildPriceUpdateEmbed(priceData, guildName = 'Vanta Network') {
 
     const formattedBuy = `${symbol} ${buyNum.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}`;
     const formattedSell = `${symbol} ${sellNum.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}`;
-    
-    const spread = (buyNum - sellNum).toFixed(2);
 
     const description = [
         `**${guildName}** has updated the real-time P2P exchange rates.\n`,
-        `> **🟢 BUY PRICE** \`\`\`${formattedBuy}\`\`\``,
-        `> **🔴 SELL PRICE** \`\`\`${formattedSell}\`\`\``
+        `🟢 **Buy Price:** \`${formattedBuy}\`    |    🔴 **Sell Price:** \`${formattedSell}\``
     ].join('\n');
-
-    const paymentMethods = priceData.paymentMethods || 'UPI • IMPS • Paytm • GPay • Bank Transfer';
 
     const embed = new EmbedBuilder()
         .setTitle('📈 USDT Market Price Update')
         .setDescription(description)
-        .setColor('#FFC107')
-        .addFields(
-            { name: '💳 Payment Methods', value: `\`${paymentMethods}\``, inline: true },
-            { name: '📊 Market Spread', value: `\`${symbol} ${spread}\``, inline: true }
-        );
+        .setColor('#FFC107');
 
     const now = new Date();
     const timestampStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -590,25 +595,42 @@ export function buildPriceUpdateEmbed(priceData, guildName = 'Vanta Network') {
 }
 
 /**
- * Builds the action row buttons for price updates.
+ * Builds the action row buttons for price updates, dynamically setting direct channel link redirect buttons.
  */
-export function buildPriceComponents(vouchChannelId) {
+export function buildPriceComponents(vouchChannelId, guildId = null, buyChannelId = null, sellChannelId = null) {
     const row = new ActionRowBuilder();
 
-    row.addComponents(
-        new ButtonBuilder()
-            .setCustomId('p2p_price_buy')
-            .setLabel('🟢 Buy USDT')
-            .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-            .setCustomId('p2p_price_sell')
-            .setLabel('🔴 Sell USDT')
-            .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-            .setCustomId(`p2p_goto_vouch:${vouchChannelId || 'default'}`)
-            .setLabel('⭐ View Vouches')
-            .setStyle(ButtonStyle.Secondary)
-    );
+    if (guildId && buyChannelId) {
+        row.addComponents(
+            new ButtonBuilder()
+                .setLabel('🟢 Buy USDT')
+                .setStyle(ButtonStyle.Link)
+                .setURL(`https://discord.com/channels/${guildId}/${buyChannelId}`)
+        );
+    } else {
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId('p2p_price_buy')
+                .setLabel('🟢 Buy USDT')
+                .setStyle(ButtonStyle.Success)
+        );
+    }
+
+    if (guildId && sellChannelId) {
+        row.addComponents(
+            new ButtonBuilder()
+                .setLabel('🔴 Sell USDT')
+                .setStyle(ButtonStyle.Link)
+                .setURL(`https://discord.com/channels/${guildId}/${sellChannelId}`)
+        );
+    } else {
+        row.addComponents(
+            new ButtonBuilder()
+                .setCustomId('p2p_price_sell')
+                .setLabel('🔴 Sell USDT')
+                .setStyle(ButtonStyle.Danger)
+        );
+    }
 
     return row;
 }
