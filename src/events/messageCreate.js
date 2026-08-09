@@ -56,16 +56,17 @@ async function handleReceiptUpload(message, client) {
     // Check if the message has any attachments
     if (!message.attachments || message.attachments.size === 0) return;
 
-    // Get P2P config to check for staff roles
-    const { getP2PConfig } = await import('../services/p2pService.js');
-    const config = await getP2PConfig(message.guild.id);
+    // Get ticket data to check if this is the ticket creator
+    const { getTicketData } = await import('../utils/database.js');
+    const ticketData = await getTicketData(message.guild.id, message.channel.id).catch(() => null);
 
-    // Verify if the sender is staff or admin. If they are, skip this (since only the client uploads the payment screenshot).
-    const staffRoleId = config.staffRoleId;
-    const isStaffOrAdmin = message.member.permissions.has(PermissionFlagsBits.ManageGuild) || 
-                           message.member.permissions.has(PermissionFlagsBits.Administrator) ||
-                           (staffRoleId && message.member.roles.cache.has(staffRoleId));
-    if (isStaffOrAdmin) return;
+    // Hybrid check: DB record OR check if they have a specific user permission overwrite (excluding owner & bot)
+    const isCreator = (ticketData && ticketData.userId === message.author.id) ||
+                      (message.channel.permissionOverwrites.cache.has(message.author.id) &&
+                       message.author.id !== message.guild.ownerId &&
+                       message.author.id !== client.user.id);
+
+    if (!isCreator) return;
 
     // Prevent duplicate receipt messages (one per ticket) using transient client memory
     if (!client.p2pReceipts) {
