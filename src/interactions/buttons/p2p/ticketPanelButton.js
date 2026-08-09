@@ -198,6 +198,9 @@ export const p2pAutologTicketButtonHandler = {
                 try {
                     const { closeTicket } = await import('../../../services/ticket.js');
                     await closeTicket(interaction.channel, client.user, 'Auto-logged P2P Deal complete.');
+
+                    const { cleanP2PPortalChannels } = await import('../../../services/p2pService.js');
+                    await cleanP2PPortalChannels(interaction.guild).catch(() => null);
                 } catch (closeErr) {
                     logger.error('Failed to auto-close ticket after autolog:', closeErr);
                 }

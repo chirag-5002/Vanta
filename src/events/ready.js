@@ -47,11 +47,12 @@ export default {
         `Level role sync: scanned ${levelRoleSummary.scannedGuilds} guilds, pruned ${levelRoleSummary.prunedRewardEntries} stale rewards, re-awarded ${levelRoleSummary.rolesReAwarded} roles, errors ${levelRoleSummary.errors}`
       );
 
-      const { autoDeployP2PPanels } = await import("../services/p2pService.js");
+      const { autoDeployP2PPanels, cleanP2PPortalChannels } = await import("../services/p2pService.js");
       for (const guild of client.guilds.cache.values()) {
         await autoDeployP2PPanels(guild).catch(() => null);
+        await cleanP2PPortalChannels(guild).catch(() => null);
       }
-      startupLog("P2P panel auto-deployment completed for looking-to-buy and looking-to-sell channels");
+      startupLog("P2P panel auto-deployment and portal channel cleaning completed");
     } catch (error) {
       logger.error("Error in ready event:", error);
     }

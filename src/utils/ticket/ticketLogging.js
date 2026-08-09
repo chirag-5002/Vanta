@@ -19,7 +19,19 @@ export async function logTicketEvent({ client, guildId, event }) {
 
     const config = await getGuildConfig(client, guildId);
 
-    const logChannelId = getLogChannelForEventType(config, event.type);
+    let logChannelId = getLogChannelForEventType(config, event.type);
+
+    // Dynamic Fallback: search for a channel named 'ticket-logs'
+    if (!logChannelId) {
+      const fallbackChannel = guild.channels.cache.find(c => 
+        c.type === ChannelType.GuildText && 
+        c.name.toLowerCase().includes('ticket-log')
+      );
+      if (fallbackChannel) {
+        logChannelId = fallbackChannel.id;
+      }
+    }
+
     if (!logChannelId) {
       return;
     }

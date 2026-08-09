@@ -706,3 +706,56 @@ export async function getGuildP2PStats(guildId) {
         totalUsdtVolume: totalVolume
     };
 }
+
+/**
+ * Automatically cleans P2P portal/price channels by removing non-panel clutter messages.
+ */
+export async function cleanP2PPortalChannels(guild) {
+    if (!guild || !guild.channels) return;
+    try {
+        const channels = await guild.channels.fetch().catch(() => null);
+        if (!channels) return;
+
+        const targetChannels = channels.filter(c => c && c.isTextBased() && (
+            c.name.includes('looking-to-buy') || c.name.includes('buy-usdt') || c.name === 'buy' ||
+            c.name.includes('looking-to-sell') || c.name.includes('sell-usdt') || c.name === 'sell' ||
+            c.name.includes('usdt-price') || c.name === 'price'
+        ));
+
+        for (const channel of targetChannels.values()) {
+            const msgs = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+            if (!msgs || msgs.size === 0) continue;
+
+            const toDelete = [];
+            for (const msg of msgs.values()) {
+                const isMainPanel = msg.author.id === guild.client.user.id && 
+                                    msg.components && 
+                                    msg.components.some(row => row.components.some(b => 
+                                        b.customId === 'p2p_trade_buy_kyc' || 
+                                        b.customId === 'p2p_trade_sell_kyc' ||
+                                        b.customId === 'p2p_price_buy'
+                                    ));
+
+                if (!isMainPanel) {
+                    toDelete.push(msg);
+                }
+            }
+
+            if (toDelete.length > 0) {
+                try {
+                    await channel.bulkDelete(toDelete).catch(async () => {
+                        for (const m of toDelete) {
+                            await m.delete().catch(() => null);
+                        }
+                    });
+                } catch (_) {
+                    for (const m of toDelete) {
+                        await m.delete().catch(() => null);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        logger.error('Error cleaning P2P portal channels:', err.message);
+    }
+}
