@@ -103,9 +103,9 @@ export const p2pDetailsModalHandler = {
             // Dynamically detect marketplace category
             const marketCategory = interaction.guild.channels.cache.find(c => 
                 c.type === ChannelType.GuildCategory && 
-                (c.name.toLowerCase().includes('market place') || 
-                 c.name.toLowerCase().includes('marketplace') || 
-                 c.name.toLowerCase().includes('p2p'))
+                (c.name.toLowerCase().includes('market') || 
+                 c.name.toLowerCase().includes('p2p') || 
+                 c.name.toLowerCase().includes('portal'))
             );
             const targetCategoryId = marketCategory ? marketCategory.id : null;
 
