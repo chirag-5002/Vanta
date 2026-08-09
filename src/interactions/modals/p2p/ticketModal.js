@@ -1,4 +1,4 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, MessageFlags } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
 import { createTicket } from '../../../services/ticket.js';
 import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed } from '../../../services/p2pService.js';
 import { logger } from '../../../utils/logger.js';
@@ -18,41 +18,125 @@ function safeGetField(fields, ...keys) {
     return null;
 }
 
-export const p2pWizardModalHandler = {
-    name: 'p2p_wizard_modal',
+// ==================== STEP 2: Amount Modal Submit → Show Dropdowns ====================
+
+export const p2pAmountModalHandler = {
+    name: 'p2p_amount_modal',
+    async execute(interaction, client, args) {
+        const tradeType = args[0] || 'buy';
+        const kycType = args[1] || 'kyc';
+        const isBuy = tradeType === 'buy';
+        const isKyc = kycType === 'kyc';
+
+        const amount = safeGetField(interaction.fields, 'q1_amount') || '100';
+
+        // Store amount in wizard selections
+        const key = `${interaction.guildId}:${interaction.user.id}`;
+        wizardSelections.set(key, {
+            tradeType,
+            kycType,
+            amount,
+        });
+
+        // Build ephemeral message with dropdowns
+        const embed = new EmbedBuilder()
+            .setTitle(`${isBuy ? '🛒 Buy' : '🔴 Sell'} ${amount} USDT — Select Options`)
+            .setDescription(
+                `**Amount:** \`${amount} USDT\` ✅\n\n` +
+                `Now select your options below:\n\n` +
+                `> 1️⃣ Choose your **${isBuy ? 'Payment' : 'Payout'} Method**\n` +
+                `> 2️⃣ Choose your **Crypto Network**\n` +
+                `> 3️⃣ Click **Next** to enter ${isBuy ? 'wallet address' : 'payout details'}\n\n` +
+                `*${isKyc ? '🔒 KYC Verified Trade' : '⚡ Non-KYC Quick Trade'}*`
+            )
+            .setColor(isBuy ? '#2ECC71' : '#E74C3C')
+            .setFooter({ text: 'Vanta P2P • Select both options then click Next' });
+
+        // Payment Method dropdown
+        const paymentOptions = isBuy
+            ? [
+                { label: 'UPI', value: 'UPI', emoji: '📱' },
+                { label: 'IMPS', value: 'IMPS', emoji: '🏦' },
+                { label: 'CDM (Cash Deposit Machine)', value: 'CDM', emoji: '🏧' },
+                { label: 'CCW (Crypto-to-Crypto Swap)', value: 'CCW', emoji: '🔄' },
+            ]
+            : [
+                { label: 'UPI', value: 'UPI', emoji: '📱' },
+                { label: 'IMPS', value: 'IMPS', emoji: '🏦' },
+            ];
+
+        const paymentMenu = new StringSelectMenuBuilder()
+            .setCustomId(`p2p_select_payment:${tradeType}:${kycType}`)
+            .setPlaceholder(`Select ${isBuy ? 'Payment' : 'Payout'} Method`)
+            .addOptions(paymentOptions);
+
+        // Network dropdown
+        const networkMenu = new StringSelectMenuBuilder()
+            .setCustomId(`p2p_select_network:${tradeType}:${kycType}`)
+            .setPlaceholder('Select Crypto Network')
+            .addOptions([
+                { label: 'USDT TRC20', value: 'USDT_TRC20', emoji: '🟢' },
+                { label: 'USDT ERC20', value: 'USDT_ERC20', emoji: '🔵' },
+                { label: 'USDT BEP20', value: 'USDT_BEP20', emoji: '🟡' },
+            ]);
+
+        // Next + Cancel buttons
+        const nextButton = new ButtonBuilder()
+            .setCustomId(`p2p_wizard_proceed:${tradeType}:${kycType}`)
+            .setLabel('➡️ Next')
+            .setStyle(ButtonStyle.Success);
+
+        const cancelButton = new ButtonBuilder()
+            .setCustomId('p2p_wizard_cancel')
+            .setLabel('❌ Cancel')
+            .setStyle(ButtonStyle.Secondary);
+
+        await interaction.reply({
+            embeds: [embed],
+            components: [
+                new ActionRowBuilder().addComponents(paymentMenu),
+                new ActionRowBuilder().addComponents(networkMenu),
+                new ActionRowBuilder().addComponents(nextButton, cancelButton),
+            ],
+            flags: MessageFlags.Ephemeral,
+        });
+    }
+};
+
+// ==================== FINAL STEP: Details Modal Submit → Create Ticket ====================
+
+export const p2pDetailsModalHandler = {
+    name: 'p2p_details_modal',
     async execute(interaction, client, args) {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
-            const tradeType = args[0] || 'buy'; // 'buy' or 'sell'
-            const kycType = args[1] || 'kyc';   // 'kyc' or 'nokyc'
-
+            const tradeType = args[0] || 'buy';
+            const kycType = args[1] || 'kyc';
             const isBuy = tradeType === 'buy';
             const isKyc = kycType === 'kyc';
 
-            const config = await getP2PConfig(interaction.guildId);
-            const paymentConfig = await getP2PPaymentConfig(interaction.guildId);
-
-            // Get amount from modal
-            const amountDisplay = safeGetField(interaction.fields, 'q1_amount', 'amount') || '100';
-
-            // Get payment method and network from wizard selections (dropdowns)
+            // Get stored wizard selections
             const key = `${interaction.guildId}:${interaction.user.id}`;
             const selections = wizardSelections.get(key) || {};
 
-            const paymentMethod = (selections.paymentMethod || safeGetField(interaction.fields, 'q2_payment', 'payment') || 'UPI').toUpperCase();
-            const networkRaw = selections.network || safeGetField(interaction.fields, 'q3_network', 'q4_network', 'network') || 'USDT_TRC20';
+            const amountDisplay = selections.amount || '100';
+            const paymentMethod = (selections.paymentMethod || 'UPI').toUpperCase();
+            const networkRaw = selections.network || 'USDT_TRC20';
             const networkLabel = networkRaw.replace(/_/g, ' ').toUpperCase();
 
             let addressDisplay = 'N/A';
             if (isBuy) {
-                addressDisplay = safeGetField(interaction.fields, 'q4_address', 'address') || 'N/A';
+                addressDisplay = safeGetField(interaction.fields, 'q_address') || 'N/A';
             } else {
-                addressDisplay = safeGetField(interaction.fields, 'q3_details', 'address') || 'N/A';
+                addressDisplay = safeGetField(interaction.fields, 'q_details') || 'N/A';
             }
 
             // Clean up wizard selections
             wizardSelections.delete(key);
+
+            const config = await getP2PConfig(interaction.guildId);
+            const paymentConfig = await getP2PPaymentConfig(interaction.guildId);
 
             const reason = `${isBuy ? 'Buy' : 'Sell'} ${amountDisplay} USDT via ${paymentMethod} (${networkLabel})`;
 
@@ -67,7 +151,7 @@ export const p2pWizardModalHandler = {
 
             const ticketChannel = result.channel;
 
-            // 2. Strict Permissions Setup (Guild Owner, Admins/Staff, Ticket Creator, Bot ONLY)
+            // 2. Strict Permissions Setup
             const staffRoleId = config.staffRoleId;
             const permissionOverlays = [
                 {
@@ -97,20 +181,15 @@ export const p2pWizardModalHandler = {
 
             await ticketChannel.permissionOverwrites.set(permissionOverlays).catch(() => null);
 
-            // 3. Build Ticket Welcome Summary Card with EXACT USER SPECIFIED ORDER FOR BUY vs SELL
-            const title = isBuy 
+            // 3. Build Ticket Welcome Summary Card
+            const title = isBuy
                 ? `🛒 Buy USDT Trade Request (${isKyc ? 'KYC Verified' : 'Non-KYC'})`
                 : `🔴 Sell USDT Trade Request (${isKyc ? 'KYC Verified' : 'Non-KYC'})`;
 
-            let cardDescription = '';
             const verificationTag = isKyc ? 'KYC Verified Deal' : 'Non-KYC Deal';
+            let cardDescription = '';
 
             if (isBuy) {
-                // FOR BUY:
-                // 1. amount
-                // 2. payment method (upi, imps, cdm, CCW)
-                // 3. network
-                // 4. wallet address
                 cardDescription = [
                     `Welcome <@${interaction.user.id}>! A verified Middleman / Support staff will assist your trade shortly.\n`,
                     `> **Trader / Creator:** <@${interaction.user.id}>`,
@@ -123,18 +202,13 @@ export const p2pWizardModalHandler = {
                     `> **Security:** \`Auto-MM Protected Trade\``
                 ].join('\n');
             } else {
-                // FOR SELL:
-                // 1. amount
-                // 2. payment method (UPI, IMPS)
-                // 3. details (upi, imps details)
-                // 4. network
                 cardDescription = [
                     `Welcome <@${interaction.user.id}>! A verified Middleman / Support staff will assist your trade shortly.\n`,
                     `> **Trader / Creator:** <@${interaction.user.id}>`,
                     `> **Trade Direction:** \`SELL USDT\``,
                     `> **1. Requested Amount:** \`${amountDisplay} USDT\``,
                     `> **2. Payout Method:** \`${paymentMethod}\``,
-                    `> **3. Payout Details (UPI/Bank):** \`${addressDisplay}\``,
+                    `> **3. Payout Details (${paymentMethod}):** \`${addressDisplay}\``,
                     `> **4. Deposit Crypto Network:** \`${networkLabel}\``,
                     `> **Verification:** \`${verificationTag}\``,
                     `> **Security:** \`Auto-MM Protected Trade\``
@@ -158,7 +232,6 @@ export const p2pWizardModalHandler = {
                     .setStyle(ButtonStyle.Danger)
             );
 
-            // Send summary embed
             await ticketChannel.send({
                 content: `<@${interaction.user.id}> ${staffRoleId ? `<@&${staffRoleId}>` : ''}`,
                 embeds: [summaryEmbed],
@@ -179,15 +252,16 @@ export const p2pWizardModalHandler = {
             });
 
         } catch (err) {
-            logger.error('Failed to create ticket from wizard modal:', err);
+            logger.error('Failed to create ticket from wizard:', err);
             const userMsg = err.userMessage || err.message || 'Failed to create ticket channel.';
             await interaction.editReply({
-                embeds: [
-                    errorEmbed('Ticket Creation Notice', userMsg)
-                ]
+                embeds: [errorEmbed('Ticket Creation Notice', userMsg)]
             }).catch(() => null);
         }
     }
 };
 
-export default p2pWizardModalHandler;
+export default [
+    p2pAmountModalHandler,
+    p2pDetailsModalHandler,
+];
