@@ -148,7 +148,7 @@ export const p2pDetailsModalHandler = {
             if (isBuy) {
                 cardDescription = [
                     `Welcome <@${interaction.user.id}>! A verified Middleman / Support staff will assist your trade shortly.\n`,
-                    `> **Trader / Creator:** <@${interaction.user.id}>`,
+                    `> **Trader / Creator:** \`${interaction.user.id}\``,
                     `> **Trade Direction:** \`BUY USDT\``,
                     `> **1. Requested Amount:** \`${amountDisplay} USDT\``,
                     `> **2. Payment Method:** \`${paymentMethod}\``,
@@ -160,7 +160,7 @@ export const p2pDetailsModalHandler = {
             } else {
                 cardDescription = [
                     `Welcome <@${interaction.user.id}>! A verified Middleman / Support staff will assist your trade shortly.\n`,
-                    `> **Trader / Creator:** <@${interaction.user.id}>`,
+                    `> **Trader / Creator:** \`${interaction.user.id}\``,
                     `> **Trade Direction:** \`SELL USDT\``,
                     `> **1. Requested Amount:** \`${amountDisplay} USDT\``,
                     `> **2. Payout Method:** \`${paymentMethod}\``,
