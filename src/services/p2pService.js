@@ -362,8 +362,9 @@ export async function autoDetectDealFromChannel(channel, guildId) {
         logger.error('Error auto-detecting deal info from channel:', { error: err.message, channelId: channel.id });
     }
 
-    buyerId = isSell ? 'server' : userCreatorId;
-    sellerId = isSell ? userCreatorId : 'server';
+    const botId = channel.client.user.id;
+    buyerId = isSell ? botId : userCreatorId;
+    sellerId = isSell ? userCreatorId : botId;
 
     return {
         buyerId,
@@ -389,9 +390,9 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
 
     if (!targetChannel) return null;
 
+    const botId = channel.client.user.id;
     const buyerId = detected.buyerId;
     const sellerId = detected.sellerId;
-
     const dealRecord = await logDeal(guildId, {
         buyerId,
         sellerId,
@@ -400,8 +401,8 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
         txHash: detected.txHash,
         dealInfo: detected.dealInfo,
         status: 'Completed',
-        loggedBy: executorId || (buyerId === 'server' ? sellerId : buyerId)
-    });
+        loggedBy: executorId || (buyerId === botId ? sellerId : buyerId)
+    }, botId);
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, channel.guild);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
@@ -432,10 +433,8 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
     const dealInfoText = deal.dealInfo || 'P2P USDT Transfer';
     const statusText = deal.status || 'Completed';
 
-    const guildName = guild ? guild.name : 'Server';
-
-    const buyerMention = deal.buyerId === 'server' ? `**${guildName}**` : `<@${deal.buyerId}>`;
-    const sellerMention = deal.sellerId === 'server' ? `**${guildName}**` : `<@${deal.sellerId}>`;
+    const buyerMention = `<@${deal.buyerId}>`;
+    const sellerMention = `<@${deal.sellerId}>`;
 
     const description = [
         `> **Between:** ${buyerMention} and ${sellerMention}`,
@@ -553,10 +552,7 @@ export function buildPriceComponents(vouchChannelId) {
     return row;
 }
 
-/**
- * Logs a new P2P deal in database and updates stats.
- */
-export async function logDeal(guildId, dealData) {
+export async function logDeal(guildId, dealData, botId = null) {
     const dealsKey = getP2PDealsKey(guildId);
     const rawDeals = await getFromDb(dealsKey, []);
     const deals = Array.isArray(rawDeals) ? rawDeals : [];
@@ -586,8 +582,8 @@ export async function logDeal(guildId, dealData) {
     const singleDealKey = getP2PDealKey(guildId, dealId);
     await setInDb(singleDealKey, record);
 
-    await updateUserStats(guildId, dealData.buyerId, record);
-    await updateUserStats(guildId, dealData.sellerId, record);
+    await updateUserStats(guildId, dealData.buyerId, record, botId);
+    await updateUserStats(guildId, dealData.sellerId, record, botId);
 
     return record;
 }
@@ -595,8 +591,8 @@ export async function logDeal(guildId, dealData) {
 /**
  * Updates P2P deal stats for a user.
  */
-async function updateUserStats(guildId, userId, dealRecord) {
-    if (!userId || userId === 'server') return;
+async function updateUserStats(guildId, userId, dealRecord, botId = null) {
+    if (!userId || userId === 'server' || userId === botId) return;
     const userStatsKey = getP2PUserStatsKey(guildId, userId);
     const current = await getFromDb(userStatsKey, {
         totalDeals: 0,
