@@ -11,6 +11,38 @@ export const p2pTradeButtonHandler = {
         const kycType = args[1] || 'kyc';
         const isBuy = tradeType === 'buy';
 
+        // KYC check if required
+        if (kycType === 'kyc') {
+            const { getKycStatus } = await import('../../../services/kycService.js');
+            const kycStatus = await getKycStatus(interaction.guildId, interaction.user.id);
+            
+            if (kycStatus.status !== 'verified') {
+                const statusLabel = kycStatus.status === 'pending' ? '⏳ Pending Review' : kycStatus.status === 'rejected' ? '❌ Rejected' : 'Not Started';
+                const embed = new EmbedBuilder()
+                    .setTitle('🔒 KYC Verification Required')
+                    .setDescription(
+                        `To trade with KYC on this server, you must complete identity verification first.\n\n` +
+                        `• **Current Status:** \`${statusLabel}\`\n` +
+                        (kycStatus.status === 'rejected' ? `• **Reason:** \`${kycStatus.rejectionReason}\`\n\n` : '\n') +
+                        `Please click the button below to start your one-time verification.`
+                    )
+                    .setColor('#FFC107');
+
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('kyc_start_verification')
+                        .setLabel('🔒 Start KYC Verification')
+                        .setStyle(ButtonStyle.Success)
+                );
+
+                return await interaction.reply({
+                    embeds: [embed],
+                    components: [row],
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+        }
+
         // Clear any previous wizard state
         const key = `${interaction.guildId}:${interaction.user.id}`;
         wizardSelections.delete(key);
