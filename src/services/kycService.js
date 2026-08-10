@@ -3,6 +3,15 @@ import { getFromDb, setInDb, saveTicketData } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 import { getP2PConfig } from './p2pService.js';
 
+function generateRandomId(length = 7) {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
 export const DEFAULT_KYC_CONFIG = {
     roleId: null,      // Role given to verified users
     categoryId: null,  // Category for KYC tickets
@@ -53,11 +62,12 @@ export async function startKycVerificationFlow(interaction, client) {
     const guild = interaction.guild;
     const member = interaction.member;
     const userId = member.id;
-    const username = member.user.username.toLowerCase();
 
-    // Check if channel already exists
+    // Check if channel already exists (any KYC channel where this user has ViewChannel overwrite)
     const existingChannel = guild.channels.cache.find(c => 
-        c && c.name && (c.name === `kyc-${username}` || c.name === `🔒-kyc-${username}`)
+        c && c.type === ChannelType.GuildText &&
+        (c.name.startsWith('kyc-') || c.name.startsWith('🔒-kyc-')) &&
+        c.permissionOverwrites.cache.has(userId)
     );
 
     if (existingChannel) {
@@ -88,22 +98,44 @@ export async function startKycVerificationFlow(interaction, client) {
     // Find parent category
     let category = categoryId ? guild.channels.cache.get(categoryId) : null;
     if (!category) {
+        // Prioritize KYC or Verification categories first
         category = guild.channels.cache.find(c =>
             c && c.type === ChannelType.GuildCategory &&
             (c.name.toLowerCase().includes('kyc') ||
              c.name.toLowerCase().includes('verify') ||
-             c.name.toLowerCase().includes('verification') ||
-             c.name.toLowerCase().includes('ticket'))
+             c.name.toLowerCase().includes('verification'))
         );
+    }
+    if (!category) {
+        // Fallback to general ticket categories
+        category = guild.channels.cache.find(c =>
+            c && c.type === ChannelType.GuildCategory &&
+            c.name.toLowerCase().includes('ticket')
+        );
+    }
+    if (!category && !categoryId) {
+        // Auto-create category if none found
+        category = await guild.channels.create({
+            name: 'KYC Verification',
+            type: ChannelType.GuildCategory,
+            permissionOverwrites: [
+                {
+                    id: guild.id,
+                    deny: [PermissionFlagsBits.ViewChannel]
+                }
+            ]
+        }).catch(() => null);
     }
 
     // Get P2P config for staff roles
     const p2pConfig = await getP2PConfig(guild.id);
     const staffRoleId = p2pConfig.staffRoleId;
 
+    const ticketId = generateRandomId(7);
+
     // Create private ticket channel
     const channel = await guild.channels.create({
-        name: `🔒-kyc-${username}`,
+        name: `🔒-kyc-${ticketId}`,
         type: ChannelType.GuildText,
         parent: category?.id || null,
         permissionOverwrites: [
@@ -260,18 +292,23 @@ export async function submitKycVerification(interaction, client, targetUserId) {
         logger.error('Failed to edit welcome message on KYC submission:', err);
     }
 
-    // Post review message for staff
+    // Post review message for staff with two embeds so both images display
     const staffEmbed = new EmbedBuilder()
         .setTitle('👤 Staff Action Required: KYC Review')
         .setDescription(
             `Please review the KYC documents uploaded by <@${userId}>:\n\n` +
-            `• [ID Photo Document](${attachments[0]})\n` +
-            `• [Selfie holding ID](${attachments[1]})`
+            `• **ID Photo:** [View Document](${attachments[0]})\n` +
+            `• **Selfie with ID:** [View Photo](${attachments[1]})`
         )
         .addFields(
             { name: 'User', value: `<@${userId}> (${userId})`, inline: true },
             { name: 'Submitted At', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
         )
+        .setColor('#FFC107')
+        .setImage(attachments[0]); // ID photo document preview
+
+    const selfieEmbed = new EmbedBuilder()
+        .setTitle('📸 Selfie holding ID preview')
         .setColor('#FFC107')
         .setImage(attachments[1]); // Selfie preview
 
@@ -291,7 +328,7 @@ export async function submitKycVerification(interaction, client, targetUserId) {
 
     await channel.send({
         content: `⚠️ **KYC Review Alert** for ${staffMention}`,
-        embeds: [staffEmbed],
+        embeds: [staffEmbed, selfieEmbed],
         components: [staffRow]
     });
 
@@ -334,14 +371,19 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
             .setTitle('👤 KYC Review - APPROVED')
             .addFields({ name: 'Approved By', value: `<@${staffMember.id}>`, inline: true });
         
+        const updatedEmbeds = [approvedEmbed];
+        if (interaction.message.embeds.length > 1) {
+            updatedEmbeds.push(interaction.message.embeds[1]);
+        }
+        
         if (interaction.isButton()) {
             await interaction.update({
-                embeds: [approvedEmbed],
+                embeds: updatedEmbeds,
                 components: []
             }).catch(() => null);
         } else {
             await interaction.message.edit({
-                embeds: [approvedEmbed],
+                embeds: updatedEmbeds,
                 components: []
             }).catch(() => null);
         }
@@ -412,7 +454,13 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
                     { name: 'Rejected By', value: `<@${staffMember.id}>`, inline: true },
                     { name: 'Reason', value: reason, inline: false }
                 );
-            await reviewMsg.edit({ embeds: [rejectedEmbed], components: [] }).catch(() => null);
+            
+            const updatedEmbeds = [rejectedEmbed];
+            if (reviewMsg.embeds.length > 1) {
+                updatedEmbeds.push(reviewMsg.embeds[1]);
+            }
+            
+            await reviewMsg.edit({ embeds: updatedEmbeds, components: [] }).catch(() => null);
         }
     }
 
