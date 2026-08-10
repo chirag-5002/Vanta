@@ -277,8 +277,8 @@ export async function submitKycVerification(interaction, client, targetUserId) {
             .setTitle('🔒 KYC Verification Submitted')
             .setDescription(
                 `✅ Thank you! Your verification documents have been submitted.\n\n` +
-                `• **ID Photo:** [View Document](${attachments[0]})\n` +
-                `• **Selfie with ID:** [View Photo](${attachments[1]})\n\n` +
+                `• **Document 1:** [View Photo](${attachments[0]})\n` +
+                `• **Document 2:** [View Photo](${attachments[1]})\n\n` +
                 `*Support staff / admins will review your submission shortly.*`
             )
             .setColor('#FFC107')
@@ -297,20 +297,19 @@ export async function submitKycVerification(interaction, client, targetUserId) {
         .setTitle('👤 Staff Action Required: KYC Review')
         .setDescription(
             `Please review the KYC documents uploaded by <@${userId}>:\n\n` +
-            `• **ID Photo:** [View Document](${attachments[0]})\n` +
-            `• **Selfie with ID:** [View Photo](${attachments[1]})`
+            `• **Document 1:** [View Photo](${attachments[0]})\n` +
+            `• **Document 2:** [View Photo](${attachments[1]})`
         )
         .addFields(
             { name: 'User', value: `<@${userId}> (${userId})`, inline: true },
             { name: 'Submitted At', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
         )
         .setColor('#FFC107')
-        .setImage(attachments[0]); // ID photo document preview
+        .setImage(attachments[0]); // Document 1 preview
 
     const selfieEmbed = new EmbedBuilder()
-        .setTitle('📸 Selfie holding ID preview')
         .setColor('#FFC107')
-        .setImage(attachments[1]); // Selfie preview
+        .setImage(attachments[1]); // Document 2 preview
 
     const staffRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
