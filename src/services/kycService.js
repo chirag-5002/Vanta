@@ -1,5 +1,5 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, MessageFlags } from 'discord.js';
-import { getFromDb, setInDb } from '../utils/database.js';
+import { getFromDb, setInDb, saveTicketData } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 import { getP2PConfig } from './p2pService.js';
 
@@ -143,7 +143,6 @@ export async function startKycVerificationFlow(interaction, client) {
     });
 
     // Save ticket metadata in database so standard ticket actions can close it if needed
-    const { saveTicketData } = await import('./ticket.js');
     const ticketData = {
         id: channel.id,
         userId: userId,
