@@ -8,23 +8,23 @@ export const DEFAULT_P2P_CONFIG = {
     staffRoleId: null,
     priceChannelId: null,
     titleText: 'Successful Transaction',
-    footerText: 'Vanta Verified Successful Deal',
+    footerText: 'ICN Verified Successful Deal',
     embedColor: '#FFC107', // Amber/Yellow matching reference design
 };
 
 export const DEFAULT_PAYMENT_CONFIG = {
-    upiId: 'vanta@upi',
+    upiId: 'icn@upi',
     upiQrUrl: null,
     impsAccount: '998877665544',
     impsIfsc: 'SBIN0001234',
-    impsName: 'Vanta P2P Exchange',
+    impsName: 'ICN P2P Exchange',
     cdmAccount: '998877665544 (State Bank of India)',
-    trc20Wallet: 'T9xVantaUSDTTRC20OfficialWalletAddress',
-    erc20Wallet: '0x71C569VantaUSDTERC20OfficialWalletAddress',
-    bep20Wallet: '0x71C569VantaUSDTBEP20OfficialWalletAddress',
-    usdcTrc20Wallet: 'T9xVantaUSDCTRC20OfficialWalletAddress',
-    usdcErc20Wallet: '0x71C569VantaUSDCERC20OfficialWalletAddress',
-    usdcBep20Wallet: '0x71C569VantaUSDCBEP20OfficialWalletAddress',
+    trc20Wallet: 'T9xICNUSDTTRC20OfficialWalletAddress',
+    erc20Wallet: '0x71C569ICNUSDTERC20OfficialWalletAddress',
+    bep20Wallet: '0x71C569ICNUSDTBEP20OfficialWalletAddress',
+    usdcTrc20Wallet: 'T9xICNUSDCTRC20OfficialWalletAddress',
+    usdcErc20Wallet: '0x71C569ICNUSDCERC20OfficialWalletAddress',
+    usdcBep20Wallet: '0x71C569ICNUSDCBEP20OfficialWalletAddress',
 };
 
 /**
@@ -136,7 +136,7 @@ export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CON
             );
     }
 
-    embed.setFooter({ text: 'Vanta Payment Security • Verify details before sending' });
+    embed.setFooter({ text: 'ICN Payment Security • Verify details before sending' });
     return embed;
 }
 
@@ -174,7 +174,7 @@ export function buildSellPaymentEmbed(network, config = DEFAULT_PAYMENT_CONFIG) 
             `> **Deposit Address:** \`${walletAddress}\`\n\n` +
             `📸 **Instruction:** Once sent, please upload your **Transaction Screenshot / Tx Hash link** in this ticket channel.`
         )
-        .setFooter({ text: 'Vanta Wallet Security • Ensure network matches before sending' });
+        .setFooter({ text: 'ICN Wallet Security • Ensure network matches before sending' });
 
     return embed;
 }
@@ -217,7 +217,7 @@ export async function autoDeployP2PPanels(guild) {
                         `Select an option below to open an instant 1-on-1 Middleman Buy Ticket:\n\n` +
                         `• **🟢 Buy with KYC:** KYC Verified trade with higher limits.\n` +
                         `• **🟢 Buy without KYC:** Instant Non-KYC quick trade.\n\n` +
-                        `*🛡️ All trades are 100% protected by Vanta Auto-MM Security.*`
+                        `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
                     )
                     .setColor('#2ECC71')
                     .setFooter({ text: `${guild.name} • Official P2P Buy Portal` });
@@ -256,7 +256,7 @@ export async function autoDeployP2PPanels(guild) {
                         `Select an option below to open an instant 1-on-1 Middleman Sell Ticket:\n\n` +
                         `• **🔴 Sell with KYC:** Fast payout for KYC Verified sellers.\n` +
                         `• **🔴 Sell without KYC:** Instant Non-KYC sell trade.\n\n` +
-                        `*🛡️ All trades are 100% protected by Vanta Auto-MM Security.*`
+                        `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
                     )
                     .setColor('#E74C3C')
                     .setFooter({ text: `${guild.name} • Official P2P Sell Portal` });
@@ -494,35 +494,27 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
 
     const botId = guild?.client?.user?.id;
 
-    // Show bot as mention (e.g. @Vanta) and human trader as raw ID in code block (e.g. `123456789`)
-    const buyerMention = (deal.buyerId === 'server' || deal.buyerId === botId) ? `<@${botId}>` : `\`${deal.buyerId}\``;
-    const sellerMention = (deal.sellerId === 'server' || deal.sellerId === botId) ? `<@${botId}>` : `\`${deal.sellerId}\``;
+    // Show bot as mention (e.g. @USDT MarketPlace) and human trader as raw ID in code block (e.g. `123456789`)
+    const botLabel = '@USDT MarketPlace';
+    const buyerMention = (deal.buyerId === 'server' || deal.buyerId === botId) ? botLabel : `\`${deal.buyerId}\``;
+    const sellerMention = (deal.sellerId === 'server' || deal.sellerId === botId) ? botLabel : `\`${deal.sellerId}\``;
 
     const description = [
         `> **Between:** ${buyerMention} and ${sellerMention}`,
         `> **Amount:** ≈ ${usdVal} / ${usdtVal}`,
-        `> **Tx:** ${txFormatted}`,
         `> **Deal Info:** ${dealInfoText}`,
         `> **Status:** \`${statusText}\``
     ].join('\n');
 
     const now = new Date();
-    const timestampText = formattedDate || now.toLocaleString('en-US', {
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-    });
-
-    const footerText = `${config.footerText || 'Vanta Verified Successful Deal'} | ${timestampText}`;
+    const footerText = config.footerText || 'ICN Verified Successful Deal';
 
     const embed = new EmbedBuilder()
         .setTitle(title)
         .setDescription(description)
         .setColor(embedColor)
-        .setFooter({ text: footerText });
+        .setFooter({ text: footerText })
+        .setTimestamp(now);
 
     return embed;
 }

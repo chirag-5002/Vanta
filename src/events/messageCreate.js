@@ -103,7 +103,7 @@ async function handleReceiptUpload(message, client) {
         `> **Estimated Time:** \`Up to 1 hour (max)\` to complete the transaction.`
       )
       .setColor('#FFC107')
-      .setFooter({ text: 'Vanta P2P Auto-MM • Keep chats inside this channel' });
+      .setFooter({ text: 'ICN P2P Auto-MM • Keep chats inside this channel' });
 
     await message.channel.send({ embeds: [embed] });
   } catch (err) {

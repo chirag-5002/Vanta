@@ -225,7 +225,7 @@ export default {
                 )
                 .addStringOption(option =>
                     option.setName('footer')
-                        .setDescription('Custom embed footer text (e.g., "Vanta Verified Successful Deal")')
+                        .setDescription('Custom embed footer text (e.g., "ICN Verified Successful Deal")')
                         .setRequired(false)
                 )
         )
@@ -395,7 +395,7 @@ async function handleTicketPanel(interaction) {
             `Click one of the buttons below to open a private 1-on-1 Middleman Trade Ticket with our verified support team!\n\n` +
             `• **🟢 Buy USDT:** Open ticket to buy USDT via INR/UPI/Bank.\n` +
             `• **🔴 Sell USDT:** Open ticket to sell USDT and receive instant payout.\n\n` +
-            `*🛡️ All transactions are 100% protected by Vanta Auto-MM Security.*`
+            `*🛡️ All transactions are 100% protected by ICN Auto-MM Security.*`
         )
         .setColor('#FFC107')
         .setFooter({ text: `${interaction.guild.name} • Official P2P Trade System` });
@@ -473,7 +473,7 @@ async function handlePriceUpdate(interaction) {
         sellPrice,
         symbol,
         paymentMethods
-    }, interaction.guild.name || 'Vanta Network');
+    }, interaction.guild.name || 'ICN Network');
 
     const { resolveP2PChannels } = await import('../../services/p2pService.js');
     const p2pChannels = resolveP2PChannels(interaction.guild);

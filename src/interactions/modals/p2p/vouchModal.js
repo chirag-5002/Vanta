@@ -47,7 +47,7 @@ export const vouchModalHandler = {
             { name: 'Feedback / Comment', value: `\`\`\`${feedback}\`\`\``, inline: false }
         );
 
-        vouchEmbed.setFooter({ text: 'Vanta P2P Trust Network | Verified Vouch' });
+        vouchEmbed.setFooter({ text: 'ICN P2P Trust Network | Verified Vouch' });
         vouchEmbed.setTimestamp();
 
         // Target vouch channel
