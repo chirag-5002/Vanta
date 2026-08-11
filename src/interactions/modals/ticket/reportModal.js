@@ -8,13 +8,14 @@ export default {
     name: 'report_details_modal',
     async execute(interaction, client, args) {
         try {
-            const deferSuccess = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
-            if (!deferSuccess) return;
+            await interaction.deferUpdate().catch(() => null);
 
             const targetUserId = args[0];
             if (!targetUserId) {
                 return await interaction.editReply({
-                    embeds: [errorEmbed('Invalid User', '❌ No target user was selected for reporting.')]
+                    content: '',
+                    embeds: [errorEmbed('Invalid User', '❌ No target user was selected for reporting.')],
+                    components: []
                 });
             }
 
@@ -37,10 +38,12 @@ export default {
 
             if (ticketChannel) {
                 await interaction.editReply({
+                    content: '',
                     embeds: [successEmbed(
                         'Report Ticket Created',
                         `✅ Your report ticket has been created: <#${ticketChannel.id}>\n\nPlease click the channel link to provide any additional screenshots or details.`
-                    )]
+                    )],
+                    components: [] // Clear the dropdown select menu
                 });
 
                 // Auto-delete the confirmation message after 3 seconds
@@ -49,10 +52,12 @@ export default {
                 }, 3000);
             } else {
                 await interaction.editReply({
+                    content: '',
                     embeds: [errorEmbed(
                         'Creation Failed',
                         '❌ Failed to create report ticket channel. Please contact an Administrator.'
-                    )]
+                    )],
+                    components: []
                 });
             }
         } catch (error) {
