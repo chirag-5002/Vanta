@@ -449,25 +449,20 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
                 `**User:** <@${userId}> (${userId})\n` +
                 `**Action:** APPROVED\n` +
                 `**Reviewed By:** <@${staffMember.id}>\n` +
-                `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>\n\n` +
-                `**Uploaded Documents:**\n` +
-                (kycStatus.attachments || []).map((url, index) => `• [Document ${index + 1}](${url})`).join('\n')
+                `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`
             )
             .setColor('#2ECC71')
             .setTimestamp();
         
-        const logEmbeds = [logEmbed];
         const attachments = kycStatus.attachments || [];
-        if (attachments[0]) {
-            logEmbed.setThumbnail(attachments[0]);
-        }
-        for (let i = 1; i < attachments.length; i++) {
-            const docEmbed = new EmbedBuilder()
-                .setColor('#2ECC71')
-                .setThumbnail(attachments[i]);
-            logEmbeds.push(docEmbed);
-        }
-        await logChannel.send({ embeds: logEmbeds }).catch(() => null);
+        
+        await logChannel.send({ 
+            embeds: [logEmbed],
+            files: attachments 
+        }).catch(async (err) => {
+            logger.warn('Failed to send kyc log with attachments, sending embed only:', err.message);
+            await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
+        });
     }
 }
 
@@ -567,24 +562,19 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
                 `**Action:** REJECTED\n` +
                 `**Reviewed By:** <@${staffMember.id}>\n` +
                 `**Reason:** ${reason}\n` +
-                `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>\n\n` +
-                `**Uploaded Documents:**\n` +
-                (kycStatus.attachments || []).map((url, index) => `• [Document ${index + 1}](${url})`).join('\n')
+                `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`
             )
             .setColor('#E74C3C')
             .setTimestamp();
 
-        const logEmbeds = [logEmbed];
         const attachments = kycStatus.attachments || [];
-        if (attachments[0]) {
-            logEmbed.setThumbnail(attachments[0]);
-        }
-        for (let i = 1; i < attachments.length; i++) {
-            const docEmbed = new EmbedBuilder()
-                .setColor('#E74C3C')
-                .setThumbnail(attachments[i]);
-            logEmbeds.push(docEmbed);
-        }
-        await logChannel.send({ embeds: logEmbeds }).catch(() => null);
+
+        await logChannel.send({ 
+            embeds: [logEmbed],
+            files: attachments 
+        }).catch(async (err) => {
+            logger.warn('Failed to send kyc log with attachments, sending embed only:', err.message);
+            await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
+        });
     }
 }
