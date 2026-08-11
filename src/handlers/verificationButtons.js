@@ -44,6 +44,11 @@ export async function handleVerificationButton(interaction, client) {
             )],
         });
 
+        // Automatically delete/dismiss the verification success ephemeral message after 10 seconds
+        setTimeout(async () => {
+            await interaction.deleteReply().catch(() => null);
+        }, 10000);
+
         // Send a nice professional greeting in the welcome channel
         try {
             const { ChannelType } = await import('discord.js');
