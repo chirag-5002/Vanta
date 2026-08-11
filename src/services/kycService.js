@@ -439,6 +439,18 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
 
     const kycConfig = await getKycConfig(guild.id);
 
+    // Remove Role if configured and user has it
+    if (kycConfig.roleId) {
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (member && member.roles.cache.has(kycConfig.roleId)) {
+            try {
+                await member.roles.remove(kycConfig.roleId, `KYC Revoked/Rejected by ${staffMember.user.tag}: ${reason}`);
+            } catch (err) {
+                logger.error(`Failed to remove KYC role from user ${userId}:`, err);
+            }
+        }
+    }
+
     // Update staff review message
     if (interaction && interaction.isModalSubmit()) {
         // If interaction is the modal submit, we need to find the staff review message to edit it
