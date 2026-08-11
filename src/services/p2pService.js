@@ -1,4 +1,4 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } from 'discord.js';
 import { getFromDb, setInDb, getP2PConfigKey, getP2PDealsKey, getP2PDealKey, getP2PUserStatsKey, getTicketData } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 
@@ -747,12 +747,17 @@ export async function cleanP2PPortalChannels(guild) {
 
             const toDelete = [];
             for (const msg of msgs.values()) {
+                // Skip if sender is an admin or has manage permissions
+                const isAdmin = msg.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
+                                msg.member?.permissions.has(PermissionFlagsBits.ManageGuild) ||
+                                (msg.author && msg.author.id === guild.ownerId);
+                if (isAdmin) continue;
+
+                // Skip if it's the bot's own P2P portal or price update panel
                 const isMainPanel = msg.author.id === guild.client.user.id && 
-                                    msg.components && 
-                                    msg.components.some(row => row.components.some(b => 
-                                        b.customId === 'p2p_trade_buy_kyc' || 
-                                        b.customId === 'p2p_trade_sell_kyc' ||
-                                        b.customId === 'p2p_price_buy'
+                                    msg.embeds.some(e => e.title && (
+                                        e.title.includes('P2P Portal') || 
+                                        e.title.includes('Market Price Update')
                                     ));
 
                 if (!isMainPanel) {

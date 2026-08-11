@@ -435,13 +435,17 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
     }
 
     // Log decision if config log channel exists or auto-detect logging-channel-of-verify
-    let logChannel = kycConfig.logChannelId ? guild.channels.cache.get(kycConfig.logChannelId) : null;
-    if (!logChannel) {
-        logChannel = guild.channels.cache.find(c =>
-            c && c.type === ChannelType.GuildText &&
-            (c.name.toLowerCase().includes('verify') || c.name.toLowerCase().includes('kyc')) &&
-            c.name.toLowerCase().includes('log')
-        );
+    const guildChannels = await guild.channels.fetch().catch(() => null);
+    let logChannel = null;
+    if (guildChannels) {
+        logChannel = kycConfig.logChannelId ? guildChannels.get(kycConfig.logChannelId) : null;
+        if (!logChannel) {
+            logChannel = guildChannels.find(c =>
+                c && c.type === ChannelType.GuildText &&
+                (c.name.toLowerCase().includes('verify') || c.name.toLowerCase().includes('kyc')) &&
+                c.name.toLowerCase().includes('log')
+            );
+        }
     }
     if (logChannel) {
         const logEmbed = new EmbedBuilder()
@@ -552,13 +556,17 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
     }
 
     // Log decision if config log channel exists or auto-detect logging-channel-of-verify
-    let logChannel = kycConfig.logChannelId ? guild.channels.cache.get(kycConfig.logChannelId) : null;
-    if (!logChannel) {
-        logChannel = guild.channels.cache.find(c =>
-            c && c.type === ChannelType.GuildText &&
-            (c.name.toLowerCase().includes('verify') || c.name.toLowerCase().includes('kyc')) &&
-            c.name.toLowerCase().includes('log')
-        );
+    const guildChannels = await guild.channels.fetch().catch(() => null);
+    let logChannel = null;
+    if (guildChannels) {
+        logChannel = kycConfig.logChannelId ? guildChannels.get(kycConfig.logChannelId) : null;
+        if (!logChannel) {
+            logChannel = guildChannels.find(c =>
+                c && c.type === ChannelType.GuildText &&
+                (c.name.toLowerCase().includes('verify') || c.name.toLowerCase().includes('kyc')) &&
+                c.name.toLowerCase().includes('log')
+            );
+        }
     }
     if (logChannel) {
         const logEmbed = new EmbedBuilder()
