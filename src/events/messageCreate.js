@@ -64,6 +64,18 @@ export default {
         }
       }
 
+      // Immediately clean user clutter in report-a-user channel
+      if (channelName.includes('report-a-user')) {
+        const isAdmin = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
+                        message.member?.permissions.has(PermissionFlagsBits.ManageGuild);
+        if (!isAdmin) {
+          await message.delete().catch(() => null);
+          const { autoDeployReportPanel } = await import('../services/reportService.js');
+          await autoDeployReportPanel(message.guild).catch(() => null);
+          return;
+        }
+      }
+
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
       const countingProcessed = await handleCountingGame(message, client);

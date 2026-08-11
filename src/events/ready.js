@@ -65,6 +65,17 @@ export default {
         logger.error("Error auto-deploying support panels on startup:", err);
       }
 
+      // Auto-deploy Report a User panel in #report-a-user
+      try {
+        const { autoDeployReportPanel } = await import("../services/reportService.js");
+        for (const guild of client.guilds.cache.values()) {
+          await autoDeployReportPanel(guild).catch(() => null);
+        }
+        startupLog("Report panel auto-deployment completed");
+      } catch (err) {
+        logger.error("Error auto-deploying report panels on startup:", err);
+      }
+
       // Pre-download and register Poppins fonts for welcome cards
       try {
         const { ensureFonts } = await import("../utils/welcomeCard.js");
