@@ -1,6 +1,55 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 import { AttachmentBuilder } from 'discord.js';
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
 import { logger } from './logger.js';
+
+const FONTS_DIR = path.resolve('src/assets/fonts');
+
+/**
+ * Downloads and registers Inter fonts locally to prevent font rendering issues on Linux/Docker servers.
+ */
+async function ensureFonts() {
+    try {
+        if (!fs.existsSync(FONTS_DIR)) {
+            fs.mkdirSync(FONTS_DIR, { recursive: true });
+        }
+
+        const boldPath = path.join(FONTS_DIR, 'Poppins-Bold.ttf');
+        const mediumPath = path.join(FONTS_DIR, 'Poppins-Medium.ttf');
+
+        if (!fs.existsSync(boldPath)) {
+            logger.info('Downloading Poppins-Bold.ttf for welcome card...');
+            const res = await axios.get('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf', { 
+                responseType: 'arraybuffer',
+                timeout: 10000
+            });
+            fs.writeFileSync(boldPath, Buffer.from(res.data));
+            logger.info('Successfully downloaded Poppins-Bold.ttf');
+        }
+
+        if (!fs.existsSync(mediumPath)) {
+            logger.info('Downloading Poppins-Medium.ttf for welcome card...');
+            const res = await axios.get('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Medium.ttf', { 
+                responseType: 'arraybuffer',
+                timeout: 10000
+            });
+            fs.writeFileSync(mediumPath, Buffer.from(res.data));
+            logger.info('Successfully downloaded Poppins-Medium.ttf');
+        }
+
+        // Register fonts dynamically
+        if (GlobalFonts.has('PoppinsBold') === false) {
+            GlobalFonts.registerFromPath(boldPath, 'PoppinsBold');
+        }
+        if (GlobalFonts.has('PoppinsMedium') === false) {
+            GlobalFonts.registerFromPath(mediumPath, 'PoppinsMedium');
+        }
+    } catch (err) {
+        logger.warn(`Could not setup custom welcome fonts: ${err.message}. Falling back to default sans-serif.`);
+    }
+}
 
 /**
  * Generates a beautiful Sapphire-style welcome card image.
@@ -12,6 +61,9 @@ import { logger } from './logger.js';
  * @returns {Promise<AttachmentBuilder>} Discord attachment builder with PNG buffer
  */
 export async function generateWelcomeCard(avatarUrl, username, guildName, memberCount) {
+    // Ensure custom premium fonts are registered first
+    await ensureFonts().catch(() => null);
+
     // Create canvas
     const width = 850;
     const height = 450;
@@ -63,7 +115,12 @@ export async function generateWelcomeCard(avatarUrl, username, guildName, member
     ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.beginPath();
     const badgeText = `Member #${memberCount}`;
-    ctx.font = 'bold 16px sans-serif';
+    
+    // Choose font name (fallback if PoppinsBold was not registered)
+    const fontBold = GlobalFonts.has('PoppinsBold') ? 'PoppinsBold' : 'sans-serif';
+    const fontMedium = GlobalFonts.has('PoppinsMedium') ? 'PoppinsMedium' : 'sans-serif';
+
+    ctx.font = `bold 16px ${fontBold}`;
     const textWidth = ctx.measureText(badgeText).width;
     const badgeW = textWidth + 30;
     const badgeH = 34;
@@ -99,7 +156,14 @@ export async function generateWelcomeCard(avatarUrl, username, guildName, member
 
     // Draw avatar image masked inside a circle
     try {
-        const avatarImage = await loadImage(avatarUrl);
+        const response = await axios.get(avatarUrl, {
+            responseType: 'arraybuffer',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            timeout: 5000
+        });
+        const avatarImage = await loadImage(Buffer.from(response.data));
         ctx.save();
         ctx.beginPath();
         ctx.arc(centerX, centerY, avatarSize / 2, 0, Math.PI * 2);
@@ -107,7 +171,7 @@ export async function generateWelcomeCard(avatarUrl, username, guildName, member
         ctx.drawImage(avatarImage, avatarX, avatarY, avatarSize, avatarSize);
         ctx.restore();
     } catch (avatarErr) {
-        logger.warn(`Failed to load avatar url ${avatarUrl} for welcome card: ${avatarErr.message}`);
+        logger.warn(`Failed to fetch avatar url via axios for welcome card: ${avatarErr.message}`);
         // Draw placeholder avatar
         ctx.save();
         ctx.fillStyle = '#2ECC71';
@@ -115,7 +179,7 @@ export async function generateWelcomeCard(avatarUrl, username, guildName, member
         ctx.arc(centerX, centerY, avatarSize / 2, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 48px sans-serif';
+        ctx.font = `bold 48px ${fontBold}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(username.substring(0, 2).toUpperCase(), centerX, centerY);
@@ -126,7 +190,7 @@ export async function generateWelcomeCard(avatarUrl, username, guildName, member
     ctx.save();
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 36px sans-serif';
+    ctx.font = `bold 36px ${fontBold}`;
     ctx.fillText(`Welcome ${username}`, width / 2, 310);
     ctx.restore();
 
@@ -134,11 +198,11 @@ export async function generateWelcomeCard(avatarUrl, username, guildName, member
     ctx.save();
     ctx.textAlign = 'center';
     ctx.fillStyle = '#A0AABF';
-    ctx.font = '18px sans-serif';
+    ctx.font = `18px ${fontMedium}`;
     ctx.fillText('to', width / 2, 345);
     
     ctx.fillStyle = '#2ECC71';
-    ctx.font = 'bold 28px sans-serif';
+    ctx.font = `bold 28px ${fontBold}`;
     ctx.fillText(guildName.toUpperCase(), width / 2, 385);
     ctx.restore();
 
