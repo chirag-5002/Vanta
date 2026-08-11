@@ -46,7 +46,7 @@ export async function handleVerificationButton(interaction, client) {
 
         // Send a nice professional greeting in the welcome channel
         try {
-            const { ChannelType, EmbedBuilder } = await import('discord.js');
+            const { ChannelType } = await import('discord.js');
             const guildChannels = await guild.channels.fetch().catch(() => null);
             let welcomeChannel = null;
             if (guildChannels) {
@@ -57,24 +57,14 @@ export async function handleVerificationButton(interaction, client) {
             }
 
             if (welcomeChannel) {
-                const welcomeEmbed = new EmbedBuilder()
-                    .setTitle('👋 Welcome to Inner Circle Network!')
-                    .setDescription(
-                        `Welcome <@${userId}> to **ICN**! 🎉\n\n` +
-                        `You have successfully completed verification and gained access to the server.\n\n` +
-                        `**Getting Started:**\n` +
-                        `• Check out our marketplace channels to start trading.\n` +
-                        `• Read the server guidelines to keep transactions safe.\n` +
-                        `• If you need help, type your query in the support channel.`
-                    )
-                    .setColor('#2ECC71')
-                    .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
-                    .setFooter({ text: `${guild.name} • Official Member Verified` })
-                    .setTimestamp();
+                const { generateWelcomeCard } = await import('../utils/welcomeCard.js');
+                const avatarUrl = interaction.user.displayAvatarURL({ extension: 'png', size: 256 });
+                const memberCount = guild.memberCount;
+                const cardAttachment = await generateWelcomeCard(avatarUrl, interaction.user.username, guild.name, memberCount);
 
                 await welcomeChannel.send({
-                    content: `👋 Welcome <@${userId}>!`,
-                    embeds: [welcomeEmbed]
+                    content: `👋 Welcome <@${userId}> to **${guild.name}**!`,
+                    files: [cardAttachment]
                 }).catch(() => null);
             }
         } catch (welcomeErr) {
