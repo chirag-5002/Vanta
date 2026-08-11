@@ -253,6 +253,26 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
     ticketData.closedAt = new Date().toISOString();
     await saveTicketData(channel.guild.id, channel.id, ticketData);
 
+    // Support query ticket: auto-delete 10 minutes after close
+    const isSupportQuery = ticketData.reason?.toLowerCase().startsWith('support query') || 
+                           channel.name.toLowerCase().startsWith('🔒-query-');
+    if (isSupportQuery) {
+      const deleteDelayMs = 10 * 60 * 1000; // 10 minutes
+      setTimeout(async () => {
+        try {
+          const freshChannel = channel.guild.channels.cache.get(channel.id) || 
+                              await channel.guild.channels.fetch(channel.id).catch(() => null);
+          if (!freshChannel) return;
+
+          const { deleteTicket } = await import('./ticket.js');
+          await deleteTicket(freshChannel, channel.client.user).catch(() => null);
+          logger.info(`Auto-deleted support query ticket channel ${freshChannel.name} (${freshChannel.id}) after 10 minutes of closing`);
+        } catch (err) {
+          logger.error('Error auto-deleting support query ticket after 10m:', err);
+        }
+      }, deleteDelayMs);
+    }
+
     // Auto-detect and publish P2P deal proof automatically on ticket close
     try {
       const { autoDetectAndPublishDeal } = await import('./p2pService.js');
