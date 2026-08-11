@@ -28,7 +28,25 @@ export default {
     try {
       if (message.author.bot || !message.guild) return;
 
+      // Immediately clean user clutter in P2P Buy/Sell portal channels
+      const channelName = message.channel.name?.toLowerCase() || '';
+      const isP2PPortal = channelName.includes('looking-to-buy') || 
+                           channelName.includes('looking-to-sell') || 
+                           channelName.includes('buy-usdt') || 
+                           channelName.includes('sell-usdt') || 
+                           channelName === 'buy' || 
+                           channelName === 'sell';
 
+      if (isP2PPortal) {
+        const isAdmin = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
+                        message.member?.permissions.has(PermissionFlagsBits.ManageGuild);
+        if (!isAdmin) {
+          await message.delete().catch(() => null);
+          const { autoDeployP2PPanels } = await import('../services/p2pService.js');
+          await autoDeployP2PPanels(message.guild).catch(() => null);
+          return;
+        }
+      }
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
