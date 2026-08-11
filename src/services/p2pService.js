@@ -507,14 +507,27 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
     ].join('\n');
 
     const now = new Date();
-    const footerText = config.footerText || 'ICN Verified Successful Deal';
+    const timestampText = now.toLocaleString('en-US', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    // Resolve footer text from config, ensure "Vanta" is replaced with "ICN"
+    let footerBase = config.footerText || 'ICN Verified Successful Deal';
+    footerBase = footerBase.replace(/Vanta/ig, 'ICN');
+
+    const finalFooterText = `${footerBase} | ${timestampText}`;
 
     const embed = new EmbedBuilder()
         .setTitle(title)
         .setDescription(description)
         .setColor(embedColor)
-        .setFooter({ text: footerText })
-        .setTimestamp(now);
+        .setFooter({ text: finalFooterText });
 
     return embed;
 }
