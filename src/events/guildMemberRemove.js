@@ -1,6 +1,6 @@
 import { Events, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { getColor, botConfig } from '../config/bot.js';
-import { getWelcomeConfig, getUserApplications, deleteApplication } from '../utils/database.js';
+import { getWelcomeConfig, getUserApplications, deleteApplication, deleteFromDb } from '../utils/database.js';
 import { formatWelcomeMessage } from '../utils/welcome.js';
 import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
 import { getServerCounters, updateCounter } from '../services/serverstatsService.js';
@@ -142,6 +142,14 @@ export default {
             logger.debug(`Removed leveling data for user ${user.id} in guild ${guild.id}`);
         } catch (error) {
             logger.debug('Error handling leveling data on member leave:', error);
+        }
+
+        try {
+            const kycUserKey = `guild:${guild.id}:kyc:user:${user.id}`;
+            await deleteFromDb(kycUserKey);
+            logger.debug(`Removed KYC verification data for user ${user.id} in guild ${guild.id}`);
+        } catch (error) {
+            logger.debug('Error removing KYC data on member leave:', error);
         }
         
     } catch (error) {
