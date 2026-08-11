@@ -1,4 +1,4 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, ChannelType } from 'discord.js';
 import { getFromDb, setInDb, getP2PConfigKey, getP2PDealsKey, getP2PDealKey, getP2PUserStatsKey, getTicketData } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 
@@ -431,11 +431,23 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
     
     const detected = await autoDetectDealFromChannel(channel, guildId);
     
-    const targetChannel = config.dealChannelId 
-        ? channel.guild.channels.cache.get(config.dealChannelId) 
-        : channel;
-
-    if (!targetChannel) return null;
+    let targetChannel = null;
+    if (config.dealChannelId) {
+        targetChannel = channel.guild.channels.cache.get(config.dealChannelId) || 
+                        await channel.guild.channels.fetch(config.dealChannelId).catch(() => null);
+    }
+    if (!targetChannel) {
+        const guildChannels = await channel.guild.channels.fetch().catch(() => null);
+        if (guildChannels) {
+            targetChannel = guildChannels.find(c =>
+                c && c.type === ChannelType.GuildText &&
+                (c.name.toLowerCase().includes('deal') || c.name.toLowerCase().includes('transac'))
+            );
+        }
+    }
+    if (!targetChannel) {
+        targetChannel = channel;
+    }
 
     const botId = channel.client.user.id;
     const buyerId = detected.buyerId;
