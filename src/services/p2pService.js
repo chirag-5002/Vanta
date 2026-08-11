@@ -285,19 +285,13 @@ export async function autoDeployP2PPanels(guild) {
         if (priceChannel) {
             const msgs = await priceChannel.messages.fetch({ limit: 10 }).catch(() => null);
             
-            // Check if there is already a link-button portal deployed by Vanta
+            // Check if there is already a portal or price update panel deployed by Vanta
             const botHasNewPanel = msgs && msgs.some(m => 
                 m.author.id === guild.client.user.id && 
-                m.components.some(row => row.components.some(b => b.style === ButtonStyle.Link))
+                m.embeds.some(e => e.title && (e.title.includes('P2P Portal') || e.title.includes('Market Price Update')))
             );
 
             if (!botHasNewPanel) {
-                if (msgs) {
-                    const oldPanels = msgs.filter(m => m.author.id === guild.client.user.id);
-                    for (const m of oldPanels.values()) {
-                        await m.delete().catch(() => null);
-                    }
-                }
 
                 const portalEmbed = new EmbedBuilder()
                     .setTitle('⚡ USDT P2P Portal')

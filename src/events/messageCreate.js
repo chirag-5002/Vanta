@@ -28,18 +28,7 @@ export default {
     try {
       if (message.author.bot || !message.guild) return;
 
-      // Clean price/p2p portal channel
-      const channelName = message.channel.name?.toLowerCase() || '';
-      if (channelName.includes('usdt-price') || channelName.includes('price')) {
-        const isAdmin = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
-                        message.member?.permissions.has(PermissionFlagsBits.ManageGuild);
-        if (!isAdmin) {
-          await message.delete().catch(() => null);
-          const { autoDeployP2PPanels } = await import('../services/p2pService.js');
-          await autoDeployP2PPanels(message.guild).catch(() => null);
-          return;
-        }
-      }
+
 
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
