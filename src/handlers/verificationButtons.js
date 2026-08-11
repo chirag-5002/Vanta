@@ -28,7 +28,20 @@ export async function handleVerificationButton(interaction, client) {
         });
 
         if (result.status === 'already_verified') {
-            return await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: 'You are already verified and have access to all server channels.' });
+            const { EmbedBuilder } = await import('discord.js');
+            const alreadyEmbed = new EmbedBuilder()
+                .setTitle('❌ Already Verified')
+                .setDescription('You have already completed verification and have full access to all server channels.')
+                .setColor('#E74C3C')
+                .setFooter({ text: 'ICN Verification System' });
+
+            await InteractionHelper.safeEditReply(interaction, { embeds: [alreadyEmbed] });
+
+            // Automatically delete/dismiss this ephemeral message after 10 seconds
+            setTimeout(async () => {
+                await interaction.deleteReply().catch(() => null);
+            }, 10000);
+            return;
         }
 
         logger.info('User verified via button', {

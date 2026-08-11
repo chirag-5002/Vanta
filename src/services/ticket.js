@@ -256,6 +256,9 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
     // Support query ticket: auto-delete 10 minutes after close
     const isSupportQuery = ticketData.reason?.toLowerCase().startsWith('support query') || 
                            channel.name.toLowerCase().startsWith('🔒-query-');
+    // Marketplace / P2P ticket: auto-delete 5 minutes after close
+    const isMarketplaceTicket = channel.name.toLowerCase().startsWith('ticket-');
+
     if (isSupportQuery) {
       const deleteDelayMs = 10 * 60 * 1000; // 10 minutes
       setTimeout(async () => {
@@ -269,6 +272,21 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
           logger.info(`Auto-deleted support query ticket channel ${freshChannel.name} (${freshChannel.id}) after 10 minutes of closing`);
         } catch (err) {
           logger.error('Error auto-deleting support query ticket after 10m:', err);
+        }
+      }, deleteDelayMs);
+    } else if (isMarketplaceTicket) {
+      const deleteDelayMs = 5 * 60 * 1000; // 5 minutes
+      setTimeout(async () => {
+        try {
+          const freshChannel = channel.guild.channels.cache.get(channel.id) || 
+                              await channel.guild.channels.fetch(channel.id).catch(() => null);
+          if (!freshChannel) return;
+
+          const { deleteTicket } = await import('./ticket.js');
+          await deleteTicket(freshChannel, channel.client.user).catch(() => null);
+          logger.info(`Auto-deleted marketplace ticket channel ${freshChannel.name} (${freshChannel.id}) after 5 minutes of closing`);
+        } catch (err) {
+          logger.error('Error auto-deleting marketplace ticket after 5m:', err);
         }
       }, deleteDelayMs);
     }
