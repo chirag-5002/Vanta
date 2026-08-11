@@ -12,7 +12,7 @@ export async function autoDeploySupportPanel(guild) {
 
         const supportChannel = channels.find(c =>
             c && c.type === ChannelType.GuildText &&
-            c.name.toLowerCase() === 'support'
+            c.name.toLowerCase().includes('support')
         );
 
         if (!supportChannel) return;

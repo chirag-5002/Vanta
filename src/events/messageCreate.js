@@ -49,7 +49,7 @@ export default {
       }
 
       // Immediately handle query ticket creation in support channel
-      if (channelName === 'support') {
+      if (channelName.includes('support')) {
         const isAdmin = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
                         message.member?.permissions.has(PermissionFlagsBits.ManageGuild);
         if (!isAdmin) {
