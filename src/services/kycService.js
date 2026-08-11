@@ -265,6 +265,7 @@ export async function submitKycVerification(interaction, client, targetUserId) {
     // Save status
     const kycStatus = {
         status: 'pending',
+        attachments: attachments,
         idPhotoUrl: attachments[0],
         selfieUrl: attachments[1],
         submittedAt: new Date().toISOString()
@@ -454,7 +455,12 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
             .setColor('#2ECC71')
             .setTimestamp();
         
-        const attachments = kycStatus.attachments || [];
+        let attachments = kycStatus.attachments || [];
+        if (attachments.length === 0 && (kycStatus.idPhotoUrl || kycStatus.selfieUrl)) {
+            attachments = [];
+            if (kycStatus.idPhotoUrl) attachments.push(kycStatus.idPhotoUrl);
+            if (kycStatus.selfieUrl) attachments.push(kycStatus.selfieUrl);
+        }
         
         await logChannel.send({ 
             embeds: [logEmbed],
@@ -567,7 +573,12 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
             .setColor('#E74C3C')
             .setTimestamp();
 
-        const attachments = kycStatus.attachments || [];
+        let attachments = kycStatus.attachments || [];
+        if (attachments.length === 0 && (kycStatus.idPhotoUrl || kycStatus.selfieUrl)) {
+            attachments = [];
+            if (kycStatus.idPhotoUrl) attachments.push(kycStatus.idPhotoUrl);
+            if (kycStatus.selfieUrl) attachments.push(kycStatus.selfieUrl);
+        }
 
         await logChannel.send({ 
             embeds: [logEmbed],
