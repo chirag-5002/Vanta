@@ -146,7 +146,7 @@ export async function createReportTicket(guild, reporter, targetUser, irritateCh
             creatorId: reporter.id,
             status: 'open',
             createdAt: new Date().toISOString(),
-            reason: `User Report: Target ${targetUser}`,
+            reason: `User Report: Target ${typeof targetUser === 'object' ? targetUser.tag : targetUser}`,
             priority: 'high'
         };
         await saveTicketData(guild.id, ticketChannel.id, ticketData).catch(() => null);
@@ -158,7 +158,7 @@ export async function createReportTicket(guild, reporter, targetUser, irritateCh
                 `👋 Welcome <@${reporter.id}> to your report ticket.\n` +
                 `Our Moderation team will review the details below shortly. You may upload screenshots/evidence in this channel if needed.\n\n` +
                 `**Report Details:**\n` +
-                `• **Reported User:** \`${targetUser}\`\n` +
+                `• **Reported User:** ${typeof targetUser === 'object' ? `<@${targetUser.id}> (${targetUser.tag})` : `\`${targetUser}\``}\n` +
                 `• **Disturbed/Irritated you?** \`${irritateCheck}\`\n` +
                 `• **Details:** ${details}`
             )
@@ -187,7 +187,7 @@ export async function createReportTicket(guild, reporter, targetUser, irritateCh
                     .setTitle('🚨 New User Report Submitted')
                     .setDescription(
                         `**Reporter:** <@${reporter.id}> (\`${reporter.id}\`)\n` +
-                        `**Reported User:** \`${targetUser}\`\n` +
+                        `**Reported User:** ${typeof targetUser === 'object' ? `<@${targetUser.id}> (\`${targetUser.id}\` - ${targetUser.tag})` : `\`${targetUser}\``}\n` +
                         `**Disturbed/Irritated:** \`${irritateCheck}\`\n` +
                         `**Ticket Channel:** <#${ticketChannel.id}>\n\n` +
                         `**Incident Details:**\n${details}`
