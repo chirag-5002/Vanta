@@ -474,6 +474,45 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
             await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
         });
     }
+
+    // Send simple status notification to the public KYC portal channel
+    await sendSimplePortalLog(guild, userId, true).catch(() => null);
+
+    // Auto-close ticket after 20 minutes, then auto-delete after 5 minutes
+    if (interaction && interaction.channel) {
+        const channelId = interaction.channel.id;
+        const closeDelayMs = 20 * 60 * 1000; // 20 minutes
+        const deleteDelayMs = 5 * 60 * 1000; // 5 minutes
+
+        setTimeout(async () => {
+            try {
+                const kycChannel = guild.channels.cache.get(channelId) || 
+                                   await guild.channels.fetch(channelId).catch(() => null);
+                if (!kycChannel) return;
+
+                const { closeTicket, deleteTicket } = await import('./ticket.js');
+                
+                await closeTicket(kycChannel, client.user, 'Auto-closed after 20 minutes of KYC approval.').catch(() => null);
+                logger.info(`Auto-closed approved KYC ticket channel ${kycChannel.id} after 20 minutes`);
+
+                setTimeout(async () => {
+                    try {
+                        const freshChannel = guild.channels.cache.get(channelId) || 
+                                            await guild.channels.fetch(channelId).catch(() => null);
+                        if (!freshChannel) return;
+
+                        await deleteTicket(freshChannel, client.user).catch(() => null);
+                        logger.info(`Auto-deleted approved KYC ticket channel ${freshChannel.id} after 5 minutes of closing`);
+                    } catch (err) {
+                        logger.error('Error in KYC auto-delete timeout:', err);
+                    }
+                }, deleteDelayMs);
+
+            } catch (err) {
+                logger.error('Error in KYC auto-close timeout:', err);
+            }
+        }, closeDelayMs);
+    }
 }
 
 export async function rejectKyc(guild, userId, reason, staffMember, client, interaction) {
@@ -595,5 +634,133 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
             logger.warn('Failed to send kyc log with attachments, sending embed only:', err.message);
             await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
         });
+    }
+
+    // Send simple status notification to the public KYC portal channel
+    await sendSimplePortalLog(guild, userId, false).catch(() => null);
+
+    // Auto-close ticket after 20 minutes, then auto-delete after 5 minutes
+    if (interaction && interaction.channel) {
+        const channelId = interaction.channel.id;
+        const closeDelayMs = 20 * 60 * 1000; // 20 minutes
+        const deleteDelayMs = 5 * 60 * 1000; // 5 minutes
+
+        setTimeout(async () => {
+            try {
+                const kycChannel = guild.channels.cache.get(channelId) || 
+                                   await guild.channels.fetch(channelId).catch(() => null);
+                if (!kycChannel) return;
+
+                const { closeTicket, deleteTicket } = await import('./ticket.js');
+                
+                await closeTicket(kycChannel, client.user, 'Auto-closed after 20 minutes of KYC rejection.').catch(() => null);
+                logger.info(`Auto-closed rejected KYC ticket channel ${kycChannel.id} after 20 minutes`);
+
+                setTimeout(async () => {
+                    try {
+                        const freshChannel = guild.channels.cache.get(channelId) || 
+                                            await guild.channels.fetch(channelId).catch(() => null);
+                        if (!freshChannel) return;
+
+                        await deleteTicket(freshChannel, client.user).catch(() => null);
+                        logger.info(`Auto-deleted rejected KYC ticket channel ${freshChannel.id} after 5 minutes of closing`);
+                    } catch (err) {
+                        logger.error('Error in KYC auto-delete timeout:', err);
+                    }
+                }, deleteDelayMs);
+
+            } catch (err) {
+                logger.error('Error in KYC auto-close timeout:', err);
+            }
+        }, closeDelayMs);
+    }
+}
+
+/**
+ * Sends a clean, simple notification to the public KYC portal channel
+ */
+async function sendSimplePortalLog(guild, userId, isApproved) {
+    try {
+        const guildChannels = await guild.channels.fetch().catch(() => null);
+        if (!guildChannels) return;
+
+        const portalChannel = guildChannels.find(c =>
+            c && c.type === ChannelType.GuildText &&
+            c.name.toLowerCase().includes('kyc') &&
+            c.name.toLowerCase().includes('portal')
+        );
+
+        if (portalChannel) {
+            const embed = new EmbedBuilder()
+                .setDescription(isApproved 
+                    ? `🟢 **KYC Approved:** <@${userId}> has been successfully verified.`
+                    : `🔴 **KYC Rejected:** <@${userId}>'s verification request was rejected.`
+                )
+                .setColor(isApproved ? '#2ECC71' : '#E74C3C')
+                .setTimestamp();
+
+            await portalChannel.send({ embeds: [embed] }).catch(() => null);
+        }
+    } catch (err) {
+        logger.debug('Failed to send simple portal log:', err.message);
+    }
+}
+
+/**
+ * Periodically scans and cleans up KYC tickets that have been inactive/idle for more than 24 hours.
+ */
+export async function cleanupIdleKycTickets(client) {
+    logger.info('Starting periodic KYC idle ticket cleanup check...');
+    try {
+        for (const guild of client.guilds.cache.values()) {
+            const guildChannels = await guild.channels.fetch().catch(() => null);
+            if (!guildChannels) continue;
+
+            const kycTickets = guildChannels.filter(c =>
+                c && c.type === ChannelType.GuildText &&
+                c.name.toLowerCase().startsWith('🔒-kyc-')
+            );
+
+            const now = Date.now();
+            const threshold = 24 * 60 * 60 * 1000; // 24 hours
+
+            for (const channel of kycTickets.values()) {
+                const ageMs = now - channel.createdTimestamp;
+                if (ageMs > threshold) {
+                    const messages = await channel.messages.fetch({ limit: 15 }).catch(() => null);
+                    let userUploadedAnything = false;
+
+                    if (messages) {
+                        for (const msg of messages.values()) {
+                            if (!msg.author.bot && (msg.attachments.size > 0 || msg.content.trim().length > 0)) {
+                                userUploadedAnything = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!userUploadedAnything) {
+                        logger.info(`Auto-closing and deleting idle KYC ticket channel ${channel.name} (${channel.id}) - inactive for 24 hours`);
+                        const { closeTicket, deleteTicket } = await import('./ticket.js');
+                        
+                        await closeTicket(channel, client.user, 'Auto-closed due to inactivity (24 hours without submission/upload).').catch(() => null);
+                        
+                        setTimeout(async () => {
+                            try {
+                                const freshChannel = guild.channels.cache.get(channel.id) || 
+                                                    await guild.channels.fetch(channel.id).catch(() => null);
+                                if (freshChannel) {
+                                    await deleteTicket(freshChannel, client.user).catch(() => null);
+                                }
+                            } catch (err) {
+                                logger.error('Error auto-deleting 24h idle ticket:', err);
+                            }
+                        }, 5000);
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        logger.error('Error in cleanupIdleKycTickets:', err);
     }
 }

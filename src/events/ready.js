@@ -53,6 +53,15 @@ export default {
         await cleanP2PPortalChannels(guild).catch(() => null);
       }
       startupLog("P2P panel auto-deployment and portal channel cleaning completed");
+
+      // Auto-cleanup idle KYC tickets (older than 24h with no uploads)
+      const { cleanupIdleKycTickets } = await import("../services/kycService.js");
+      await cleanupIdleKycTickets(client).catch(() => null);
+
+      // Run idle KYC ticket cleanup check every 1 hour
+      setInterval(async () => {
+          await cleanupIdleKycTickets(client).catch(() => null);
+      }, 60 * 60 * 1000);
     } catch (error) {
       logger.error("Error in ready event:", error);
     }
