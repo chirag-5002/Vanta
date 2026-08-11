@@ -313,7 +313,7 @@ export default {
  * Handle payment accounts configuration
  */
 async function handlePaymentConfig(interaction) {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
         return await replyUserError(interaction, {
             type: ErrorTypes.PERMISSION,
             message: 'You need `Manage Server` permission to configure payment accounts.'
@@ -376,7 +376,7 @@ async function handlePaymentConfig(interaction) {
  * Handle Posting P2P Ticket Creation Panel
  */
 async function handleTicketPanel(interaction) {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
         return await replyUserError(interaction, {
             type: ErrorTypes.PERMISSION,
             message: 'You need `Manage Server` permission to post the P2P ticket panel.'
@@ -440,8 +440,10 @@ async function handleTicketPanel(interaction) {
 async function handlePriceUpdate(interaction) {
     const config = await getP2PConfig(interaction.guildId);
 
-    const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
-    const hasStaffRole = config.staffRoleId ? interaction.member.roles.cache.has(config.staffRoleId) : false;
+    const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || false;
+    const hasStaffRole = config.staffRoleId && interaction.member
+        ? (interaction.member.roles?.cache?.has ? interaction.member.roles.cache.has(config.staffRoleId) : Array.isArray(interaction.member.roles) && interaction.member.roles.includes(config.staffRoleId))
+        : false;
 
     if (!hasManageGuild && !hasStaffRole) {
         return await replyUserError(interaction, {
@@ -522,8 +524,10 @@ async function handlePriceUpdate(interaction) {
 async function handleAutoLog(interaction) {
     const config = await getP2PConfig(interaction.guildId);
 
-    const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
-    const hasStaffRole = config.staffRoleId ? interaction.member.roles.cache.has(config.staffRoleId) : false;
+    const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || false;
+    const hasStaffRole = config.staffRoleId && interaction.member
+        ? (interaction.member.roles?.cache?.has ? interaction.member.roles.cache.has(config.staffRoleId) : Array.isArray(interaction.member.roles) && interaction.member.roles.includes(config.staffRoleId))
+        : false;
 
     if (!hasManageGuild && !hasStaffRole) {
         return await replyUserError(interaction, {
@@ -584,7 +588,7 @@ async function handleAutoLog(interaction) {
  * Handle P2P setup configuration
  */
 async function handleSetup(interaction) {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
         return await replyUserError(interaction, {
             type: ErrorTypes.PERMISSION,
             message: 'You need the `Manage Server` permission to configure P2P system settings.'
@@ -647,8 +651,10 @@ async function handleSetup(interaction) {
 async function handleDeal(interaction) {
     const config = await getP2PConfig(interaction.guildId);
 
-    const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
-    const hasStaffRole = config.staffRoleId ? interaction.member.roles.cache.has(config.staffRoleId) : false;
+    const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || false;
+    const hasStaffRole = config.staffRoleId && interaction.member
+        ? (interaction.member.roles?.cache?.has ? interaction.member.roles.cache.has(config.staffRoleId) : Array.isArray(interaction.member.roles) && interaction.member.roles.includes(config.staffRoleId))
+        : false;
 
     if (!hasManageGuild && !hasStaffRole) {
         const requiredMsg = config.staffRoleId

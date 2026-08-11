@@ -196,8 +196,10 @@ export const p2pAutologTicketButtonHandler = {
             const config = await getP2PConfig(interaction.guildId);
 
             // Permission check: Only staff or admins can complete/log deals
-            const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
-            const hasStaffRole = config.staffRoleId ? interaction.member.roles.cache.has(config.staffRoleId) : false;
+            const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || false;
+            const hasStaffRole = config.staffRoleId && interaction.member
+                ? (interaction.member.roles?.cache?.has ? interaction.member.roles.cache.has(config.staffRoleId) : Array.isArray(interaction.member.roles) && interaction.member.roles.includes(config.staffRoleId))
+                : false;
 
             if (!hasManageGuild && !hasStaffRole) {
                 const requiredMsg = config.staffRoleId

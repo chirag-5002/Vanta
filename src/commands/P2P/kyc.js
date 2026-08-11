@@ -119,8 +119,10 @@ export default {
             const { getP2PConfig } = await import('../../services/p2pService.js');
             const p2pConfig = await getP2PConfig(interaction.guildId);
 
-            const hasManageGuild = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild);
-            const hasStaffRole = p2pConfig.staffRoleId ? interaction.member.roles.cache.has(p2pConfig.staffRoleId) : false;
+            const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || false;
+            const hasStaffRole = p2pConfig.staffRoleId && interaction.member
+                ? (interaction.member.roles?.cache?.has ? interaction.member.roles.cache.has(p2pConfig.staffRoleId) : Array.isArray(interaction.member.roles) && interaction.member.roles.includes(p2pConfig.staffRoleId))
+                : false;
 
             if (!hasManageGuild && !hasStaffRole && interaction.user.id !== interaction.guild.ownerId) {
                 return await replyUserError(interaction, {
