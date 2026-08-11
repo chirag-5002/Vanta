@@ -179,7 +179,7 @@ async function handleSetup(interaction, guild, client) {
         );
     }
 
-    await InteractionHelper.safeDefer(interaction);
+    await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
 
     const verifyEmbed = createEmbed({
         title: "Server Verification",
