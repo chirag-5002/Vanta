@@ -1,4 +1,4 @@
-import { Events, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { Events, EmbedBuilder, PermissionFlagsBits, ChannelType } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getLevelingConfig, getUserLevelData } from '../services/leveling/leveling.js';
 import { addXp } from '../services/leveling/xpSystem.js';
@@ -22,14 +22,137 @@ import {
 const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
 const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
 
+// Anti-spam configuration for #p2p-chat and #chat-box
+const spamTrackers = new Map();
+const SPAM_MAX_MESSAGES = 5;
+const SPAM_WINDOW_MS = 4000;
+const SPAM_MAX_DUPLICATES = 4;
+const TIMEOUT_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 export default {
   name: Events.MessageCreate,
   async execute(message, client) {
     try {
       if (message.author.bot || !message.guild) return;
 
-      // Immediately clean user clutter in P2P Buy/Sell portal channels
       const channelName = message.channel.name?.toLowerCase() || '';
+
+      // Immediately run anti-spam checks in #p2p-chat and #chat-box
+      const isSpamProtectedChannel = channelName.includes('p2p-chat') || channelName.includes('chat-box');
+      if (isSpamProtectedChannel) {
+        const isAdminOrMod = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
+                             message.member?.permissions.has(PermissionFlagsBits.Administrator);
+        
+        if (!isAdminOrMod) {
+          const userId = message.author.id;
+          const now = Date.now();
+          const messageContent = message.content?.trim().toLowerCase() || '';
+
+          if (!spamTrackers.has(userId)) {
+            spamTrackers.set(userId, {
+              timestamps: [now],
+              lastMessage: messageContent,
+              duplicateCount: 1
+            });
+          } else {
+            const data = spamTrackers.get(userId);
+            data.timestamps = data.timestamps.filter(t => now - t < SPAM_WINDOW_MS);
+            data.timestamps.push(now);
+
+            if (messageContent.length > 0 && data.lastMessage === messageContent) {
+              data.duplicateCount += 1;
+            } else {
+              data.lastMessage = messageContent;
+              data.duplicateCount = 1;
+            }
+
+            spamTrackers.set(userId, data);
+
+            let isSpamming = false;
+            let spamReason = '';
+
+            if (data.timestamps.length >= SPAM_MAX_MESSAGES) {
+              isSpamming = true;
+              spamReason = 'Sending too many messages too quickly';
+            } else if (data.duplicateCount >= SPAM_MAX_DUPLICATES) {
+              isSpamming = true;
+              spamReason = 'Sending duplicate messages repeatedly';
+            }
+
+            if (isSpamming) {
+              spamTrackers.delete(userId);
+
+              const member = message.member;
+              let timeoutSuccess = false;
+              if (member && member.moderatable) {
+                try {
+                  await member.timeout(TIMEOUT_DURATION_MS, `Anti-Spam: ${spamReason} in #${message.channel.name}`);
+                  timeoutSuccess = true;
+                } catch (timeoutErr) {
+                  logger.error(`Failed to timeout user ${userId} for spam:`, timeoutErr);
+                }
+              }
+
+              if (timeoutSuccess) {
+                // Delete user's spam messages
+                try {
+                  const recentMessages = await message.channel.messages.fetch({ limit: 15 }).catch(() => null);
+                  if (recentMessages) {
+                    const userSpamMsgs = recentMessages.filter(m => m.author.id === userId);
+                    for (const m of userSpamMsgs.values()) {
+                      await m.delete().catch(() => null);
+                    }
+                  }
+                } catch (delErr) {
+                  logger.warn('Failed to clean up spam messages:', delErr.message);
+                }
+
+                // Send warning notification in channel (deletes in 10s)
+                const warnMsg = await message.channel.send({
+                  content: `⚠️ **Anti-Spam System:** <@${userId}> has been timed out (muted) for 24 hours due to spamming in this channel.`
+                }).catch(() => null);
+
+                if (warnMsg) {
+                  setTimeout(async () => {
+                    await warnMsg.delete().catch(() => null);
+                  }, 10000);
+                }
+
+                // Log to moderation channel
+                try {
+                  const guildChannels = await message.guild.channels.fetch().catch(() => null) || message.guild.channels.cache;
+                  const logChannel = guildChannels.find(c => 
+                    c && c.type === ChannelType.GuildText && 
+                    (c.name.toLowerCase() === 'logging' || c.name.toLowerCase() === 'mod' || c.name.toLowerCase().includes('log'))
+                  );
+
+                  if (logChannel) {
+                    const logEmbed = new EmbedBuilder()
+                      .setTitle('🚨 Anti-Spam Auto-Timeout Triggered')
+                      .setDescription(
+                        `**User:** <@${userId}> (${message.author.tag})\n` +
+                        `**User ID:** \`${userId}\`\n` +
+                        `**Action:** Timed Out (24 Hours)\n` +
+                        `**Channel:** <#${message.channel.id}>\n` +
+                        `**Reason:** ${spamReason}\n` +
+                        `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`
+                      )
+                      .setColor('#E74C3C')
+                      .setTimestamp();
+
+                    await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
+                  }
+                } catch (logErr) {
+                  logger.error('Failed to log spam timeout to log channel:', logErr);
+                }
+              }
+              return;
+            }
+          }
+        }
+      }
+
+      // Immediately clean user clutter in P2P Buy/Sell portal channels
       const isP2PPortal = channelName.includes('looking-to-buy') || 
                            channelName.includes('looking-to-sell') || 
                            channelName.includes('buy-usdt') || 
