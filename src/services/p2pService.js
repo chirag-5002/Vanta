@@ -303,8 +303,7 @@ export async function autoDeployP2PPanels(guild) {
                     .setTitle('⚡ USDT P2P Portal')
                     .setDescription(
                         `Welcome to **${guild.name}** P2P Trading Hub!\n\n` +
-                        `🟢 **Buy USDT**    |    🔴 **Sell USDT**\n\n` +
-                        `*🛡️ All deals are fully secured by Vanta Automated Escrow System.*`
+                        `🟢 **Buy USDT**    |    🔴 **Sell USDT**`
                     )
                     .setColor('#FFC107')
                     .setFooter({ text: `${guild.name} • Official P2P Hub` });
@@ -579,8 +578,7 @@ export function buildPriceUpdateEmbed(priceData, guildName = 'Vanta Network') {
 
     const description = [
         `**${guildName}** has updated the real-time P2P exchange rates.`,
-        `Select an option below to be redirected to the secure portal channels where you can request a Buy or Sell ticket.\n`,
-        `*🛡️ All deals are fully secured by Vanta Automated Escrow System.*`
+        `Select an option below to be redirected to the secure portal channels where you can request a Buy or Sell ticket.`
     ].join('\n');
 
     const embed = new EmbedBuilder()
