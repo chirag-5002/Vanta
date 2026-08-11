@@ -5,20 +5,34 @@ import { successEmbed, errorEmbed } from '../../../utils/embeds.js';
 import { logger } from '../../../utils/logger.js';
 
 export default {
-    name: 'report_user_modal',
-    async execute(interaction, client) {
+    name: 'report_details_modal',
+    async execute(interaction, client, args) {
         try {
             const deferSuccess = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
             if (!deferSuccess) return;
 
-            const targetUser = interaction.fields.getTextInputValue('target_user')?.trim();
+            const targetUserId = args[0];
+            if (!targetUserId) {
+                return await interaction.editReply({
+                    embeds: [errorEmbed('Invalid User', '❌ No target user was selected for reporting.')]
+                });
+            }
+
+            // Fetch the target user object
+            let targetUser = null;
+            try {
+                targetUser = await client.users.fetch(targetUserId);
+            } catch (fetchErr) {
+                logger.warn(`Could not fetch target user ${targetUserId}: ${fetchErr.message}`);
+                targetUser = targetUserId; // Fallback to raw ID string
+            }
+
             const irritateCheck = interaction.fields.getTextInputValue('irritate_check')?.trim();
             const details = interaction.fields.getTextInputValue('details')?.trim();
 
             const guild = interaction.guild;
             const reporter = interaction.user;
 
-            // Trigger ticket creation
             const ticketChannel = await createReportTicket(guild, reporter, targetUser, irritateCheck, details, client);
 
             if (ticketChannel) {
