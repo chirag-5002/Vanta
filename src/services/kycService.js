@@ -442,7 +442,7 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
         if (!logChannel) {
             logChannel = guildChannels.find(c =>
                 c && c.type === ChannelType.GuildText &&
-                (c.name.toLowerCase().includes('verify') || c.name.toLowerCase().includes('kyc')) &&
+                c.name.toLowerCase().includes('kyc') &&
                 c.name.toLowerCase().includes('log')
             );
         }
@@ -602,7 +602,7 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
         if (!logChannel) {
             logChannel = guildChannels.find(c =>
                 c && c.type === ChannelType.GuildText &&
-                (c.name.toLowerCase().includes('verify') || c.name.toLowerCase().includes('kyc')) &&
+                c.name.toLowerCase().includes('kyc') &&
                 c.name.toLowerCase().includes('log')
             );
         }

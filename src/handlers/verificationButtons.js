@@ -83,6 +83,46 @@ export async function handleVerificationButton(interaction, client) {
             logger.error('[Welcome] Failed to send welcome message:', welcomeErr);
         }
 
+        // Log the verification to logging-channel-of-verify
+        try {
+            const { ChannelType, EmbedBuilder } = await import('discord.js');
+            const guildChannels = await guild.channels.fetch().catch(() => null) || guild.channels.cache;
+            let logChannel = null;
+            if (guildChannels) {
+                logChannel = guildChannels.find(c => 
+                    c && c.type === ChannelType.GuildText && 
+                    (c.name.toLowerCase() === 'logging-channel-of-verify' || 
+                     c.name.toLowerCase().includes('logging-channel-of-verify') ||
+                     c.name.toLowerCase().includes('verify-log') ||
+                     c.name.toLowerCase().includes('verification-log'))
+                );
+            }
+
+            if (logChannel) {
+                const logEmbed = new EmbedBuilder()
+                    .setTitle('🔒 Member Verification Log')
+                    .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+                    .setDescription(
+                        `**User:** <@${userId}> (${interaction.user.tag})\n` +
+                        `**User ID:** \`${userId}\`\n` +
+                        `**Action:** Verified (Access Granted)\n` +
+                        `**Role Assigned:** **${result.roleName}**\n` +
+                        `**Method:** Server Button Verification\n` +
+                        `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`
+                    )
+                    .setColor('#2ECC71')
+                    .setFooter({ text: 'ICN Verification Logging System' })
+                    .setTimestamp();
+
+                await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
+                logger.info(`[Logging] Logged verification of user ${userId} to #${logChannel.name}`);
+            } else {
+                logger.warn('[Logging] Could not find #logging-channel-of-verify channel to log verification event');
+            }
+        } catch (logErr) {
+            logger.error('[Logging] Failed to log verification event to channel:', logErr);
+        }
+
     } catch (error) {
         logger.error('Error in verification button handler', {
             error: error.message,
