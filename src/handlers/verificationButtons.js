@@ -51,8 +51,9 @@ export async function handleVerificationButton(interaction, client) {
 
         // Send a nice professional greeting in the welcome channel
         try {
+            logger.info(`[Welcome] Starting welcome flow for user: ${userId}`);
             const { ChannelType } = await import('discord.js');
-            const guildChannels = await guild.channels.fetch().catch(() => null);
+            const guildChannels = await guild.channels.fetch().catch(() => null) || guild.channels.cache;
             let welcomeChannel = null;
             if (guildChannels) {
                 welcomeChannel = guildChannels.find(c => 
@@ -61,19 +62,25 @@ export async function handleVerificationButton(interaction, client) {
                 );
             }
 
+            logger.info(`[Welcome] Resolved welcome channel: ${welcomeChannel ? `#${welcomeChannel.name} (${welcomeChannel.id})` : 'Not Found'}`);
+
             if (welcomeChannel) {
                 const { generateWelcomeCard } = await import('../utils/welcomeCard.js');
                 const avatarUrl = interaction.user.displayAvatarURL({ extension: 'png', size: 256 });
                 const memberCount = guild.memberCount;
+                
+                logger.info('[Welcome] Generating welcome card image...');
                 const cardAttachment = await generateWelcomeCard(avatarUrl, interaction.user.username, guild.name, memberCount);
+                logger.info('[Welcome] Welcome card generated successfully. Sending message...');
 
                 await welcomeChannel.send({
                     content: `👋 Welcome <@${userId}> to **${guild.name}**!`,
                     files: [cardAttachment]
-                }).catch(() => null);
+                });
+                logger.info('[Welcome] Welcome message sent successfully.');
             }
         } catch (welcomeErr) {
-            logger.warn('Failed to send welcome message:', welcomeErr.message);
+            logger.error('[Welcome] Failed to send welcome message:', welcomeErr);
         }
 
     } catch (error) {
