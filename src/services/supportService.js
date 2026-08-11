@@ -58,16 +58,23 @@ export async function createSupportQueryTicket(guild, member, query, client) {
     try {
         const user = member.user;
         
-        // Find category named "logging" (case-insensitive) or create it if not exists
+        // Find category named "support-logging" (case-insensitive) or create it if not exists
         const channels = await guild.channels.fetch().catch(() => null);
         let category = channels ? channels.find(c => 
             c && c.type === ChannelType.GuildCategory && 
-            c.name.toLowerCase() === 'logging'
+            (c.name.toLowerCase() === 'support-logging' || c.name.toLowerCase().includes('support-log'))
         ) : null;
 
         if (!category) {
+            category = channels ? channels.find(c => 
+                c && c.type === ChannelType.GuildCategory && 
+                c.name.toLowerCase().includes('support')
+            ) : null;
+        }
+
+        if (!category) {
             category = await guild.channels.create({
-                name: 'logging',
+                name: 'support-logging',
                 type: ChannelType.GuildCategory,
                 permissionOverwrites: [
                     {
