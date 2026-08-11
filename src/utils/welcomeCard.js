@@ -10,7 +10,7 @@ const FONTS_DIR = path.resolve('src/assets/fonts');
 /**
  * Downloads and registers Inter fonts locally to prevent font rendering issues on Linux/Docker servers.
  */
-async function ensureFonts() {
+export async function ensureFonts() {
     try {
         if (!fs.existsSync(FONTS_DIR)) {
             fs.mkdirSync(FONTS_DIR, { recursive: true });

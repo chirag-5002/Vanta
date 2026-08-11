@@ -65,6 +65,15 @@ export default {
         logger.error("Error auto-deploying support panels on startup:", err);
       }
 
+      // Pre-download and register Poppins fonts for welcome cards
+      try {
+        const { ensureFonts } = await import("../utils/welcomeCard.js");
+        await ensureFonts().catch(() => null);
+        startupLog("Welcome card Poppins fonts pre-downloaded and registered successfully");
+      } catch (err) {
+        logger.warn("Failed to pre-register welcome fonts on startup:", err);
+      }
+
       // Auto-cleanup idle KYC tickets (older than 24h with no uploads)
       const { cleanupIdleKycTickets } = await import("../services/kycService.js");
       await cleanupIdleKycTickets(client).catch(() => null);
