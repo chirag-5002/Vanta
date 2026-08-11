@@ -292,24 +292,32 @@ export async function submitKycVerification(interaction, client, targetUserId) {
         logger.error('Failed to edit welcome message on KYC submission:', err);
     }
 
-    // Post review message for staff with two embeds so both images display
+    // Post review message for staff with thumbnails so images display as small boxes
+    const staffEmbeds = [];
     const staffEmbed = new EmbedBuilder()
         .setTitle('👤 Staff Action Required: KYC Review')
         .setDescription(
             `Please review the KYC documents uploaded by <@${userId}>:\n\n` +
-            `• **Document 1:** [View Photo](${attachments[0]})\n` +
-            `• **Document 2:** [View Photo](${attachments[1]})`
+            attachments.map((url, index) => `• **Document ${index + 1}:** [View Photo](${url})`).join('\n')
         )
         .addFields(
             { name: 'User', value: `<@${userId}> (${userId})`, inline: true },
             { name: 'Submitted At', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
         )
-        .setColor('#FFC107')
-        .setImage(attachments[0]); // Document 1 preview
+        .setColor('#FFC107');
 
-    const selfieEmbed = new EmbedBuilder()
-        .setColor('#FFC107')
-        .setImage(attachments[1]); // Document 2 preview
+    if (attachments[0]) {
+        staffEmbed.setThumbnail(attachments[0]); // Document 1 thumbnail
+    }
+    staffEmbeds.push(staffEmbed);
+
+    // Add extra thumbnails for additional documents (renders as small boxes in a grid)
+    for (let i = 1; i < attachments.length; i++) {
+        const extraEmbed = new EmbedBuilder()
+            .setColor('#FFC107')
+            .setThumbnail(attachments[i]);
+        staffEmbeds.push(extraEmbed);
+    }
 
     const staffRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -327,7 +335,7 @@ export async function submitKycVerification(interaction, client, targetUserId) {
 
     await channel.send({
         content: `⚠️ **KYC Review Alert** for ${staffMention}`,
-        embeds: [staffEmbed, selfieEmbed],
+        embeds: staffEmbeds,
         components: [staffRow]
     });
 
@@ -371,8 +379,8 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
             .addFields({ name: 'Approved By', value: `<@${staffMember.id}>`, inline: true });
         
         const updatedEmbeds = [approvedEmbed];
-        if (interaction.message.embeds.length > 1) {
-            updatedEmbeds.push(interaction.message.embeds[1]);
+        for (let i = 1; i < interaction.message.embeds.length; i++) {
+            updatedEmbeds.push(EmbedBuilder.from(interaction.message.embeds[i]));
         }
         
         if (interaction.isButton()) {
@@ -388,13 +396,32 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
         }
     }
 
-    // Send confirmation to the channel
+    // Send confirmation to the channel with direct trading buttons
     const successChannelEmbed = new EmbedBuilder()
         .setTitle('🎉 KYC Approved')
-        .setDescription(`Congratulations <@${userId}>! Your KYC Verification has been **approved** by <@${staffMember.id}>${roleAssignedMessage}.\n\n*This ticket will close automatically in 10 seconds.*`)
+        .setDescription(
+            `Congratulations <@${userId}>! Your KYC Verification has been **approved** by <@${staffMember.id}>${roleAssignedMessage}.\n\n` +
+            `You can now start trading with KYC directly from this channel!\n` +
+            `Use the buttons below to open a trade, or close this ticket if you are finished.`
+        )
         .setColor('#2ECC71');
 
-    await interaction.channel.send({ embeds: [successChannelEmbed] }).catch(() => null);
+    const tradeRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('p2p_trade_buy_kyc')
+            .setLabel('🟢 Buy with KYC')
+            .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+            .setCustomId('p2p_trade_sell_kyc')
+            .setLabel('🔴 Sell with KYC')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId('ticket_close')
+            .setLabel('🔒 Close Ticket')
+            .setStyle(ButtonStyle.Danger)
+    );
+
+    await interaction.channel.send({ embeds: [successChannelEmbed], components: [tradeRow] }).catch(() => null);
 
     // Send DM notification
     const targetUser = await client.users.fetch(userId).catch(() => null);
@@ -406,27 +433,42 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
         await targetUser.send({ embeds: [dmEmbed] }).catch(() => null);
     }
 
-    // Log decision if config log channel exists
-    if (kycConfig.logChannelId) {
-        const logChannel = guild.channels.cache.get(kycConfig.logChannelId);
-        if (logChannel) {
-            const logEmbed = new EmbedBuilder()
-                .setTitle('🔒 KYC Verification Action')
-                .setDescription(`**User:** <@${userId}> (${userId})\n**Action:** APPROVED\n**Reviewed By:** <@${staffMember.id}>\n**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`)
-                .setColor('#2ECC71');
-            await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
-        }
+    // Log decision if config log channel exists or auto-detect logging-channel-of-verify
+    let logChannel = kycConfig.logChannelId ? guild.channels.cache.get(kycConfig.logChannelId) : null;
+    if (!logChannel) {
+        logChannel = guild.channels.cache.find(c =>
+            c && c.type === ChannelType.GuildText &&
+            (c.name.toLowerCase().includes('verify') || c.name.toLowerCase().includes('kyc')) &&
+            c.name.toLowerCase().includes('log')
+        );
     }
-
-    // Set timeout to close ticket
-    setTimeout(async () => {
-        try {
-            const { closeTicket } = await import('./ticket.js');
-            await closeTicket(interaction.channel, client.user, 'KYC Verification Approved');
-        } catch (err) {
-            logger.error('Failed to auto-close KYC ticket after approval:', err);
+    if (logChannel) {
+        const logEmbed = new EmbedBuilder()
+            .setTitle('🔒 KYC Verification Approved')
+            .setDescription(
+                `**User:** <@${userId}> (${userId})\n` +
+                `**Action:** APPROVED\n` +
+                `**Reviewed By:** <@${staffMember.id}>\n` +
+                `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>\n\n` +
+                `**Uploaded Documents:**\n` +
+                (kycStatus.attachments || []).map((url, index) => `• [Document ${index + 1}](${url})`).join('\n')
+            )
+            .setColor('#2ECC71')
+            .setTimestamp();
+        
+        const logEmbeds = [logEmbed];
+        const attachments = kycStatus.attachments || [];
+        if (attachments[0]) {
+            logEmbed.setThumbnail(attachments[0]);
         }
-    }, 10000);
+        for (let i = 1; i < attachments.length; i++) {
+            const docEmbed = new EmbedBuilder()
+                .setColor('#2ECC71')
+                .setThumbnail(attachments[i]);
+            logEmbeds.push(docEmbed);
+        }
+        await logChannel.send({ embeds: logEmbeds }).catch(() => null);
+    }
 }
 
 export async function rejectKyc(guild, userId, reason, staffMember, client, interaction) {
@@ -467,8 +509,8 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
                 );
             
             const updatedEmbeds = [rejectedEmbed];
-            if (reviewMsg.embeds.length > 1) {
-                updatedEmbeds.push(reviewMsg.embeds[1]);
+            for (let i = 1; i < reviewMsg.embeds.length; i++) {
+                updatedEmbeds.push(EmbedBuilder.from(reviewMsg.embeds[i]));
             }
             
             await reviewMsg.edit({ embeds: updatedEmbeds, components: [] }).catch(() => null);
@@ -508,15 +550,41 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
         await targetUser.send({ embeds: [dmEmbed] }).catch(() => null);
     }
 
-    // Log decision if config log channel exists
-    if (kycConfig.logChannelId) {
-        const logChannel = guild.channels.cache.get(kycConfig.logChannelId);
-        if (logChannel) {
-            const logEmbed = new EmbedBuilder()
-                .setTitle('🔒 KYC Verification Action')
-                .setDescription(`**User:** <@${userId}> (${userId})\n**Action:** REJECTED\n**Reviewed By:** <@${staffMember.id}>\n**Reason:** ${reason}\n**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`)
-                .setColor('#E74C3C');
-            await logChannel.send({ embeds: [logEmbed] }).catch(() => null);
+    // Log decision if config log channel exists or auto-detect logging-channel-of-verify
+    let logChannel = kycConfig.logChannelId ? guild.channels.cache.get(kycConfig.logChannelId) : null;
+    if (!logChannel) {
+        logChannel = guild.channels.cache.find(c =>
+            c && c.type === ChannelType.GuildText &&
+            (c.name.toLowerCase().includes('verify') || c.name.toLowerCase().includes('kyc')) &&
+            c.name.toLowerCase().includes('log')
+        );
+    }
+    if (logChannel) {
+        const logEmbed = new EmbedBuilder()
+            .setTitle('🔒 KYC Verification Rejected')
+            .setDescription(
+                `**User:** <@${userId}> (${userId})\n` +
+                `**Action:** REJECTED\n` +
+                `**Reviewed By:** <@${staffMember.id}>\n` +
+                `**Reason:** ${reason}\n` +
+                `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>\n\n` +
+                `**Uploaded Documents:**\n` +
+                (kycStatus.attachments || []).map((url, index) => `• [Document ${index + 1}](${url})`).join('\n')
+            )
+            .setColor('#E74C3C')
+            .setTimestamp();
+
+        const logEmbeds = [logEmbed];
+        const attachments = kycStatus.attachments || [];
+        if (attachments[0]) {
+            logEmbed.setThumbnail(attachments[0]);
         }
+        for (let i = 1; i < attachments.length; i++) {
+            const docEmbed = new EmbedBuilder()
+                .setColor('#E74C3C')
+                .setThumbnail(attachments[i]);
+            logEmbeds.push(docEmbed);
+        }
+        await logChannel.send({ embeds: logEmbeds }).catch(() => null);
     }
 }
