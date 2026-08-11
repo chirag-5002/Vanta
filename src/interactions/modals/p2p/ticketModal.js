@@ -68,7 +68,7 @@ export const p2pAmountModalHandler = {
 export const p2pDetailsModalHandler = {
     name: 'p2p_details_modal',
     async execute(interaction, client, args) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferUpdate().catch(() => null);
 
         try {
             const tradeType = args[0] || 'buy';
@@ -213,14 +213,22 @@ export const p2pDetailsModalHandler = {
             }
 
             await interaction.editReply({
-                content: `✅ Your **${isBuy ? 'Buy' : 'Sell'} USDT Ticket** has been created in <#${ticketChannel.id}>!`
-            });
+                content: `✅ Your **${isBuy ? 'Buy' : 'Sell'} USDT Ticket** has been created in <#${ticketChannel.id}>!`,
+                embeds: [],
+                components: []
+            }).catch(() => null);
+
+            setTimeout(async () => {
+                await interaction.deleteReply().catch(() => null);
+            }, 3000);
 
         } catch (err) {
             logger.error('Failed to create ticket from wizard:', err);
             const userMsg = err.userMessage || err.message || 'Failed to create ticket channel.';
             await interaction.editReply({
-                embeds: [errorEmbed('Ticket Creation Notice', userMsg)]
+                content: `❌ Ticket Creation Failed.`,
+                embeds: [errorEmbed('Ticket Creation Notice', userMsg)],
+                components: []
             }).catch(() => null);
         }
     }
