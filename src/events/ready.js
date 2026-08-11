@@ -54,6 +54,17 @@ export default {
       }
       startupLog("P2P panel auto-deployment and portal channel cleaning completed");
 
+      // Auto-deploy Support panel in #support channel
+      try {
+        const { autoDeploySupportPanel } = await import("../services/supportService.js");
+        for (const guild of client.guilds.cache.values()) {
+          await autoDeploySupportPanel(guild).catch(() => null);
+        }
+        startupLog("Support panel auto-deployment completed");
+      } catch (err) {
+        logger.error("Error auto-deploying support panels on startup:", err);
+      }
+
       // Auto-cleanup idle KYC tickets (older than 24h with no uploads)
       const { cleanupIdleKycTickets } = await import("../services/kycService.js");
       await cleanupIdleKycTickets(client).catch(() => null);

@@ -48,6 +48,22 @@ export default {
         }
       }
 
+      // Immediately handle query ticket creation in support channel
+      if (channelName === 'support') {
+        const isAdmin = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
+                        message.member?.permissions.has(PermissionFlagsBits.ManageGuild);
+        if (!isAdmin) {
+          const userQuery = message.content;
+          await message.delete().catch(() => null);
+
+          if (userQuery && userQuery.trim().length > 0) {
+            const { createSupportQueryTicket } = await import('../services/supportService.js');
+            await createSupportQueryTicket(message.guild, message.member, userQuery, client).catch(() => null);
+          }
+          return;
+        }
+      }
+
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
       const countingProcessed = await handleCountingGame(message, client);

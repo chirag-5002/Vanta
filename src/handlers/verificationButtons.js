@@ -44,6 +44,43 @@ export async function handleVerificationButton(interaction, client) {
             )],
         });
 
+        // Send a nice professional greeting in the welcome channel
+        try {
+            const { ChannelType, EmbedBuilder } = await import('discord.js');
+            const guildChannels = await guild.channels.fetch().catch(() => null);
+            let welcomeChannel = null;
+            if (guildChannels) {
+                welcomeChannel = guildChannels.find(c => 
+                    c && c.type === ChannelType.GuildText && 
+                    (c.name.toLowerCase().includes('welcome') || c.name.toLowerCase().includes('greet') || c.name.toLowerCase().includes('join'))
+                );
+            }
+
+            if (welcomeChannel) {
+                const welcomeEmbed = new EmbedBuilder()
+                    .setTitle('👋 Welcome to Inner Circle Network!')
+                    .setDescription(
+                        `Welcome <@${userId}> to **ICN**! 🎉\n\n` +
+                        `You have successfully completed verification and gained access to the server.\n\n` +
+                        `**Getting Started:**\n` +
+                        `• Check out our marketplace channels to start trading.\n` +
+                        `• Read the server guidelines to keep transactions safe.\n` +
+                        `• If you need help, type your query in the support channel.`
+                    )
+                    .setColor('#2ECC71')
+                    .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+                    .setFooter({ text: `${guild.name} • Official Member Verified` })
+                    .setTimestamp();
+
+                await welcomeChannel.send({
+                    content: `👋 Welcome <@${userId}>!`,
+                    embeds: [welcomeEmbed]
+                }).catch(() => null);
+            }
+        } catch (welcomeErr) {
+            logger.warn('Failed to send welcome message:', welcomeErr.message);
+        }
+
     } catch (error) {
         logger.error('Error in verification button handler', {
             error: error.message,
