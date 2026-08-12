@@ -1,4 +1,4 @@
-import { EmbedBuilder, MessageFlags } from 'discord.js';
+import { EmbedBuilder, MessageFlags, ChannelType } from 'discord.js';
 import { getFromDb, getP2PDealKey } from '../../../utils/database.js';
 import { getP2PConfig } from '../../../services/p2pService.js';
 import { successEmbed } from '../../../utils/embeds.js';
@@ -50,10 +50,19 @@ export const vouchModalHandler = {
         vouchEmbed.setFooter({ text: 'ICN P2P Trust Network | Verified Vouch' });
         vouchEmbed.setTimestamp();
 
-        // Target vouch channel
-        const targetVouchChannel = config.vouchChannelId
-            ? interaction.guild.channels.cache.get(config.vouchChannelId)
-            : interaction.channel;
+        // Target vouch channel: first search for #feedback-comment
+        const guildChannels = await interaction.guild.channels.fetch().catch(() => null) || interaction.guild.channels.cache;
+        let targetVouchChannel = guildChannels.find(c => 
+            c && c.type === ChannelType.GuildText && 
+            (c.name.toLowerCase() === 'feedback-comment' || c.name.toLowerCase().includes('feedback-comment'))
+        );
+
+        // Fallback to configured vouch channel or interaction channel
+        if (!targetVouchChannel) {
+            targetVouchChannel = config.vouchChannelId
+                ? interaction.guild.channels.cache.get(config.vouchChannelId)
+                : interaction.channel;
+        }
 
         if (targetVouchChannel) {
             try {

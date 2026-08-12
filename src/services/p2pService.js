@@ -285,7 +285,7 @@ export async function autoDeployP2PPanels(guild) {
         if (priceChannel) {
             const msgs = await priceChannel.messages.fetch({ limit: 10 }).catch(() => null);
             
-            // Check if there is already a portal or price update panel deployed by Vanta
+            // Check if there is already a portal or price update panel deployed by ICN
             const botHasNewPanel = msgs && msgs.some(m => 
                 m.author.id === guild.client.user.id && 
                 m.embeds.some(e => e.title && (e.title.includes('P2P Portal') || e.title.includes('Market Price Update')))
@@ -474,7 +474,102 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
     dealRecord.messageId = sentMsg.id;
     dealRecord.channelId = targetChannel.id;
 
+    // Call helper to send vouch/snap redirect messages and schedule 30-min auto-close
+    if (channel && channel.id !== targetChannel.id) {
+        await sendVouchMessagesAndScheduleClose(channel, dealRecord).catch(() => null);
+    }
+
     return dealRecord;
+}
+
+/**
+ * Sends transaction complete feedback/vouch messages and schedules auto-closing of the ticket channel after 30 minutes.
+ */
+export async function sendVouchMessagesAndScheduleClose(channel, dealRecord) {
+    if (!channel || !dealRecord) return;
+
+    // Check if this is actually a ticket channel before sending vouch messages and closing
+    const name = channel.name?.toLowerCase() || '';
+    const isTicket = name.includes('ticket') || name.startsWith('buy-') || name.startsWith('sell-') || name.startsWith('p2p-');
+    if (!isTicket) return;
+
+    // Message 1: Vouch/Feedback request
+    const successEmbedObj = new EmbedBuilder()
+        .setTitle('🎉 Transaction Complete')
+        .setDescription(
+            `Thank you for trading with **ICN**! 🎉\n\n` +
+            `The trade of **${dealRecord.usdtAmount} USDT** has been marked as complete and logged.\n` +
+            `Please click the button below to **Submit Vouch / Feedback** about your experience.`
+        )
+        .setColor('#2ECC71')
+        .setTimestamp();
+
+    const ticketComponents = new ActionRowBuilder();
+    ticketComponents.addComponents(
+        new ButtonBuilder()
+            .setCustomId(`p2p_vouch_btn:${dealRecord.dealId}`)
+            .setLabel('⭐ Submit Vouch / Feedback')
+            .setStyle(ButtonStyle.Primary)
+    );
+
+    await channel.send({
+        embeds: [successEmbedObj],
+        components: [ticketComponents]
+    }).catch(() => null);
+
+    // Message 2: Share screenshots/receipts in #transaction-snaps
+    const guildChannels = await channel.guild.channels.fetch().catch(() => null) || channel.guild.channels.cache;
+    const snapsChannel = guildChannels.find(c => 
+        c && c.type === ChannelType.GuildText && 
+        (c.name.toLowerCase() === 'transaction-snaps' || c.name.toLowerCase().includes('transaction-snaps'))
+    );
+
+    const snapsEmbed = new EmbedBuilder()
+        .setTitle('📸 Share Transaction Screenshot / Snap')
+        .setDescription(
+            `To keep our community safe and transparent, please upload your **payment proof, receipt, or transaction screenshot** in the ${snapsChannel ? `<#${snapsChannel.id}>` : '#transaction-snaps'} channel.`
+        )
+        .setColor('#3498DB')
+        .setTimestamp();
+
+    const snapsComponents = new ActionRowBuilder();
+    if (snapsChannel) {
+        snapsComponents.addComponents(
+            new ButtonBuilder()
+                .setLabel('📸 Go to #transaction-snaps')
+                .setStyle(ButtonStyle.Link)
+                .setUrl(`https://discord.com/channels/${channel.guild.id}/${snapsChannel.id}`)
+            );
+    } else {
+        snapsComponents.addComponents(
+            new ButtonBuilder()
+                .setCustomId('p2p_snaps_not_found')
+                .setLabel('📸 Share Screenshots')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true)
+        );
+    }
+
+    await channel.send({
+        embeds: [snapsEmbed],
+        components: [snapsComponents]
+    }).catch(() => null);
+
+    // Schedule auto-close in 30 minutes (1800000 ms)
+    setTimeout(async () => {
+        try {
+            const exists = channel.guild.channels.cache.has(channel.id);
+            if (!exists) return;
+
+            const { closeTicket } = await import('./ticket.js');
+            await closeTicket(channel, channel.client.user, 'Auto-logged P2P Deal complete.');
+
+            const { cleanP2PPortalChannels } = await import('./p2pService.js');
+            await cleanP2PPortalChannels(channel.guild).catch(() => null);
+        } catch (closeErr) {
+            logger.error('Failed to auto-close ticket after 30 minutes:', closeErr);
+        }
+    }, 30 * 60 * 1000);
 }
 
 /**
@@ -548,13 +643,6 @@ export function buildDealComponents(vouchChannelId, dealId) {
             .setEmoji('📌')
     );
 
-    row.addComponents(
-        new ButtonBuilder()
-            .setCustomId(`p2p_vouch_btn:${dealId}`)
-            .setLabel('⭐ Submit Vouch / Feedback')
-            .setStyle(ButtonStyle.Primary)
-    );
-
     return row;
 }
 
@@ -579,7 +667,7 @@ export function resolveP2PChannels(guild) {
 /**
  * Builds the Ultra-Professional USDT Market Price Update Embed matching reference design.
  */
-export function buildPriceUpdateEmbed(priceData, guildName = 'Vanta Network') {
+export function buildPriceUpdateEmbed(priceData, guildName = 'ICN Network') {
     const symbol = priceData.symbol || '₹';
     const buyNum = parseFloat(priceData.buyPrice) || 0;
     const sellNum = parseFloat(priceData.sellPrice) || 0;

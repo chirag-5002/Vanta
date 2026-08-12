@@ -216,29 +216,8 @@ export const p2pAutologTicketButtonHandler = {
                 return;
             }
 
-            // Send simple "Transaction Complete" embed in the ticket channel (no details)
-            const successEmbed = new EmbedBuilder()
-                .setTitle('🎉 Transaction Complete')
-                .setColor('#2ECC71');
-
-            // Post transaction success message publicly in the ticket channel (non-ephemeral)
-            await interaction.channel.send({ embeds: [successEmbed] });
-
             // Reply to the staff interaction
-            await interaction.editReply({ content: '✅ Deal details auto-detected and transaction proof posted successfully! Ticket will close in 1 minute.' });
-
-            // Auto-close ticket after 60 seconds (1 minute)
-            setTimeout(async () => {
-                try {
-                    const { closeTicket } = await import('../../../services/ticket.js');
-                    await closeTicket(interaction.channel, client.user, 'Auto-logged P2P Deal complete.');
-
-                    const { cleanP2PPortalChannels } = await import('../../../services/p2pService.js');
-                    await cleanP2PPortalChannels(interaction.guild).catch(() => null);
-                } catch (closeErr) {
-                    logger.error('Failed to auto-close ticket after autolog:', closeErr);
-                }
-            }, 60000);
+            await interaction.editReply({ content: '✅ Deal details auto-detected and transaction proof posted successfully! Ticket will close automatically in 30 minutes.' });
 
         } catch (err) {
             logger.error('Failed to complete/autolog deal via button:', err);

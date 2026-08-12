@@ -716,6 +716,31 @@ async function handleDeal(interaction) {
             });
         }
 
+        if (interaction.channel) {
+            const successEmbedObj = new EmbedBuilder()
+                .setTitle('🎉 Transaction Complete')
+                .setDescription(
+                    `Thank you for trading with **ICN**! 🎉\n\n` +
+                    `The trade of **${dealRecord.usdtAmount} USDT** has been marked as complete and logged.\n` +
+                    `Please click the button below to **Submit Vouch / Feedback** about your experience.`
+                )
+                .setColor('#2ECC71')
+                .setTimestamp();
+
+            const ticketComponents = new ActionRowBuilder();
+            ticketComponents.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`p2p_vouch_btn:${dealRecord.dealId}`)
+                    .setLabel('⭐ Submit Vouch / Feedback')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+            await interaction.channel.send({
+                embeds: [successEmbedObj],
+                components: [ticketComponents]
+            }).catch(() => null);
+        }
+
         return await InteractionHelper.safeEditReply(interaction, {
             embeds: [
                 successEmbed(
