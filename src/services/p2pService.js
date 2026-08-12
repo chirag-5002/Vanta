@@ -559,7 +559,7 @@ export async function sendVouchMessagesAndScheduleClose(channel, dealRecord) {
             new ButtonBuilder()
                 .setLabel('📸 Go to #transaction-snaps')
                 .setStyle(ButtonStyle.Link)
-                .setUrl(`https://discord.com/channels/${channel.guild.id}/${snapsChannel.id}`)
+                .setURL(`https://discord.com/channels/${channel.guild.id}/${snapsChannel.id}`)
         );
     } else {
         ticketComponents.addComponents(
