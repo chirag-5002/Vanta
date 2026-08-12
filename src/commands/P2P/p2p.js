@@ -399,8 +399,8 @@ async function handleTicketPanel(interaction) {
             .setDescription(
                 `Welcome to **${interaction.guild.name}** USDT Buying Portal!\n\n` +
                 `Select an option below to open an instant 1-on-1 Middleman Buy Ticket:\n\n` +
-                `• **🟢 Buy with KYC:** KYC Verified trade with higher limits.\n` +
-                `• **🟢 Buy without KYC:** Instant Non-KYC quick trade.\n\n` +
+                `• **🟢 Buy with KYC:** Only **0.1% fee** (You receive **99.9%** of requested USDT).\n` +
+                `• **🟢 Buy without KYC:** Standard **1% fee** (You receive **99%** of requested USDT).\n\n` +
                 `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
             )
             .setColor('#2ECC71')
@@ -422,8 +422,8 @@ async function handleTicketPanel(interaction) {
             .setDescription(
                 `Welcome to **${interaction.guild.name}** USDT Selling Portal!\n\n` +
                 `Select an option below to open an instant 1-on-1 Middleman Sell Ticket:\n\n` +
-                `• **🔴 Sell with KYC:** Fast payout for KYC Verified sellers.\n` +
-                `• **🔴 Sell without KYC:** Instant Non-KYC sell trade.\n\n` +
+                `• **🔴 Sell with KYC:** Full rate payout (Flat ₹100 network fee deducted).\n` +
+                `• **🔴 Sell without KYC:** **1% fee** deducted on your USDT before payout calculation.\n\n` +
                 `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
             )
             .setColor('#E74C3C')
@@ -512,6 +512,11 @@ async function handlePriceUpdate(interaction) {
     const pingOption = interaction.options.getString('ping') || 'none';
     const channelOverride = interaction.options.getChannel('channel');
     const paymentMethods = interaction.options.getString('payment_methods');
+
+    // Update config cache for prices so bot remembers them
+    config.lastBuyPrice = buyPrice;
+    config.lastSellPrice = sellPrice;
+    await saveP2PConfig(interaction.guildId, config).catch(() => null);
 
     const targetChannel = channelOverride || (config.priceChannelId ? interaction.guild.channels.cache.get(config.priceChannelId) : interaction.channel);
 

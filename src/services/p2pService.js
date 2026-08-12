@@ -215,8 +215,8 @@ export async function autoDeployP2PPanels(guild) {
                     .setDescription(
                         `Welcome to **${guild.name}** USDT Buying Portal!\n\n` +
                         `Select an option below to open an instant 1-on-1 Middleman Buy Ticket:\n\n` +
-                        `• **🟢 Buy with KYC:** KYC Verified trade with higher limits.\n` +
-                        `• **🟢 Buy without KYC:** Instant Non-KYC quick trade.\n\n` +
+                        `• **🟢 Buy with KYC:** Only **0.1% fee** (You receive **99.9%** of requested USDT).\n` +
+                        `• **🟢 Buy without KYC:** Standard **1% fee** (You receive **99%** of requested USDT).\n\n` +
                         `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
                     )
                     .setColor('#2ECC71')
@@ -254,8 +254,8 @@ export async function autoDeployP2PPanels(guild) {
                     .setDescription(
                         `Welcome to **${guild.name}** USDT Selling Portal!\n\n` +
                         `Select an option below to open an instant 1-on-1 Middleman Sell Ticket:\n\n` +
-                        `• **🔴 Sell with KYC:** Fast payout for KYC Verified sellers.\n` +
-                        `• **🔴 Sell without KYC:** Instant Non-KYC sell trade.\n\n` +
+                        `• **🔴 Sell with KYC:** Full rate payout (Flat ₹100 network fee deducted).\n` +
+                        `• **🔴 Sell without KYC:** **1% fee** deducted on your USDT before payout calculation.\n\n` +
                         `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
                     )
                     .setColor('#E74C3C')
@@ -895,4 +895,65 @@ export async function cleanP2PPortalChannels(guild) {
     } catch (err) {
         logger.error('Error cleaning P2P portal channels:', err.message);
     }
+}
+
+/**
+ * Resolves the latest buy and sell prices from configuration database or channel fallback.
+ */
+export async function resolveLatestPrices(guild) {
+    const config = await getP2PConfig(guild.id).catch(() => null) || DEFAULT_P2P_CONFIG;
+    
+    let buyPrice = parseFloat(config.lastBuyPrice);
+    let sellPrice = parseFloat(config.lastSellPrice);
+    
+    if (!isNaN(buyPrice) && !isNaN(sellPrice) && buyPrice > 0 && sellPrice > 0) {
+        return { buyPrice, sellPrice };
+    }
+    
+    try {
+        const guildChannels = await guild.channels.fetch().catch(() => null) || guild.channels.cache;
+        const priceChannel = guildChannels.find(c =>
+            c && c.isTextBased() &&
+            (c.id === config.priceChannelId || c.name.toLowerCase().includes('usdt-price') || c.name.toLowerCase() === 'price')
+        );
+        
+        if (priceChannel) {
+            const messages = await priceChannel.messages.fetch({ limit: 20 }).catch(() => null);
+            if (messages) {
+                const priceMsg = messages.find(m => 
+                    m.author.id === guild.client.user.id && 
+                    m.embeds.some(e => e.title && e.title.includes('Market Price Update'))
+                );
+                
+                if (priceMsg && priceMsg.embeds[0]) {
+                    const fields = priceMsg.embeds[0].fields || [];
+                    
+                    let buyVal = null;
+                    let sellVal = null;
+                    
+                    for (const field of fields) {
+                        const name = field.name.toLowerCase();
+                        if (name.includes('buy')) {
+                            const match = field.value.replace(/```/g, '').match(/(\d+(\.\d+)?)/);
+                            if (match) buyVal = parseFloat(match[1]);
+                        } else if (name.includes('sell')) {
+                            const match = field.value.replace(/```/g, '').match(/(\d+(\.\d+)?)/);
+                            if (match) sellVal = parseFloat(match[1]);
+                        }
+                    }
+                    
+                    if (buyVal && sellVal) {
+                        config.lastBuyPrice = buyVal;
+                        config.lastSellPrice = sellVal;
+                        await saveP2PConfig(guild.id, config).catch(() => null);
+                        return { buyPrice: buyVal, sellPrice: sellVal };
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        logger.error('Failed to resolve price from channel fallback:', err);
+    }
+    
+    return { buyPrice: 105, sellPrice: 98 };
 }

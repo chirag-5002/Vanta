@@ -146,7 +146,11 @@ export const p2pDetailsModalHandler = {
 
             await ticketChannel.permissionOverwrites.set(permissionOverlays).catch(() => null);
 
-            // 3. Build Ticket Welcome Summary Card
+            // 3. Resolve Daily Prices and Build Ticket Welcome Summary Card
+            const { resolveLatestPrices } = await import('../../../services/p2pService.js');
+            const { buyPrice, sellPrice } = await resolveLatestPrices(interaction.guild);
+            const amountVal = parseFloat(amountDisplay) || 0;
+
             const title = isBuy
                 ? `🛒 Buy USDT Trade Request (${isKyc ? 'KYC Verified' : 'Non-KYC'})`
                 : `🔴 Sell USDT Trade Request (${isKyc ? 'KYC Verified' : 'Non-KYC'})`;
@@ -155,27 +159,43 @@ export const p2pDetailsModalHandler = {
             let cardDescription = '';
 
             if (isBuy) {
+                const totalInr = amountVal * buyPrice;
+                const receiveUsdt = isKyc ? (amountVal * 0.999) : (amountVal * 0.99);
+                const feePercentage = isKyc ? '0.1%' : '1%';
+
                 cardDescription = [
                     `Welcome <@${interaction.user.id}>! A verified Middleman / Support staff will assist your trade shortly.\n`,
                     `> **Trader / Creator:** \`${interaction.user.id}\``,
                     `> **Trade Direction:** \`BUY USDT\``,
                     `> **1. Requested Amount:** \`${amountDisplay} USDT\``,
-                    `> **2. Payment Method:** \`${paymentMethod}\``,
-                    `> **3. Crypto Network:** \`${networkLabel}\``,
-                    `> **4. Your Receiving Wallet Address:** \`${addressDisplay}\``,
-                    `> **Verification:** \`${verificationTag}\``,
+                    `> **2. Current Buy Rate:** \`₹${buyPrice.toFixed(2)} INR\``,
+                    `> **3. Total INR to Pay:** \`₹${totalInr.toFixed(2)} INR\``,
+                    `> **4. Verification:** \`${verificationTag}\` (\`${feePercentage}\` fee)`,
+                    `> **5. Net USDT You Receive:** \`${receiveUsdt.toFixed(2)} USDT\``,
+                    `> **6. Payment Method:** \`${paymentMethod}\``,
+                    `> **7. Crypto Network:** \`${networkLabel}\``,
+                    `> **8. Your Receiving Wallet Address:** \`${addressDisplay}\``,
                     `> **Security:** \`Auto-MM Protected Trade\``
                 ].join('\n');
             } else {
+                const netUsdtForPayout = isKyc ? amountVal : (amountVal * 0.99);
+                let totalInrPayout = netUsdtForPayout * sellPrice;
+                if (isKyc) {
+                    totalInrPayout = totalInrPayout - 100;
+                }
+                const feeDetails = isKyc ? 'Flat ₹100 network fee' : '1% non-KYC fee';
+
                 cardDescription = [
                     `Welcome <@${interaction.user.id}>! A verified Middleman / Support staff will assist your trade shortly.\n`,
                     `> **Trader / Creator:** \`${interaction.user.id}\``,
                     `> **Trade Direction:** \`SELL USDT\``,
                     `> **1. Requested Amount:** \`${amountDisplay} USDT\``,
-                    `> **2. Payout Method:** \`${paymentMethod}\``,
-                    `> **3. Payout Details (${paymentMethod}):** \`${addressDisplay}\``,
-                    `> **4. Deposit Crypto Network:** \`${networkLabel}\``,
-                    `> **Verification:** \`${verificationTag}\``,
+                    `> **2. Current Sell Rate:** \`₹${sellPrice.toFixed(2)} INR\``,
+                    `> **3. Verification:** \`${verificationTag}\` (\`${feeDetails}\`)`,
+                    `> **4. Net Payout You Receive:** \`₹${totalInrPayout.toFixed(2)} INR\``,
+                    `> **5. Payout Method:** \`${paymentMethod}\``,
+                    `> **6. Payout Details (${paymentMethod}):** \`${addressDisplay}\``,
+                    `> **7. Deposit Crypto Network:** \`${networkLabel}\``,
                     `> **Security:** \`Auto-MM Protected Trade\``
                 ].join('\n');
             }
