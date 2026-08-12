@@ -269,7 +269,7 @@ export async function autoDeployP2PPanels(guild) {
                     new ButtonBuilder()
                         .setCustomId('p2p_trade_sell_nokyc')
                         .setLabel('🔴 Sell without KYC')
-                        .setStyle(ButtonStyle.Secondary)
+                        .setStyle(ButtonStyle.Primary)
                 );
 
                 await sellChannel.send({ embeds: [sellEmbed], components: [sellRow] }).catch(() => null);
