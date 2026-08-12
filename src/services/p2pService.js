@@ -437,12 +437,35 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
                         await channel.guild.channels.fetch(config.dealChannelId).catch(() => null);
     }
     if (!targetChannel) {
-        const guildChannels = await channel.guild.channels.fetch().catch(() => null);
+        const guildChannels = await channel.guild.channels.fetch().catch(() => null) || channel.guild.channels.cache;
         if (guildChannels) {
-            targetChannel = guildChannels.find(c =>
-                c && c.type === ChannelType.GuildText &&
-                (c.name.toLowerCase().includes('deal') || c.name.toLowerCase().includes('transac'))
+            // Priority 1: Exact match for completed-transactions
+            targetChannel = guildChannels.find(c => 
+                c && c.type === ChannelType.GuildText && 
+                c.name.toLowerCase() === 'completed-transactions'
             );
+            
+            // Priority 2: Contains completed-transactions
+            if (!targetChannel) {
+                targetChannel = guildChannels.find(c => 
+                    c && c.type === ChannelType.GuildText && 
+                    c.name.toLowerCase().includes('completed-transactions')
+                );
+            }
+
+            // Priority 3: Contains completed/deals/transac, but not current channel, and not a ticket channel
+            if (!targetChannel) {
+                targetChannel = guildChannels.find(c =>
+                    c && c.type === ChannelType.GuildText &&
+                    c.id !== channel.id &&
+                    !c.name.toLowerCase().includes('ticket') &&
+                    !c.name.toLowerCase().startsWith('buy-') &&
+                    !c.name.toLowerCase().startsWith('sell-') &&
+                    (c.name.toLowerCase().includes('deal') || 
+                     c.name.toLowerCase().includes('transac') || 
+                     c.name.toLowerCase().includes('completed'))
+                );
+            }
         }
     }
     if (!targetChannel) {
@@ -849,7 +872,6 @@ export async function cleanP2PPortalChannels(guild) {
         for (const channel of targetChannels.values()) {
             const msgs = await channel.messages.fetch({ limit: 100 }).catch(() => null);
             if (!msgs || msgs.size === 0) continue;
-
             const toDelete = [];
             for (const msg of msgs.values()) {
                 // Skip if sender is an admin or has manage permissions

@@ -218,6 +218,28 @@ export const p2pDetailsModalHandler = {
                 components: []
             }).catch(() => null);
 
+            // Clean up any messages sent by the ticket creator in the P2P portal channels
+            try {
+                const guildChannels = await interaction.guild.channels.fetch().catch(() => null) || interaction.guild.channels.cache;
+                if (guildChannels) {
+                    const portalChannels = guildChannels.filter(c => c && c.isTextBased() && (
+                        c.name.includes('looking-to-buy') || c.name.includes('buy-usdt') || c.name === 'buy' ||
+                        c.name.includes('looking-to-sell') || c.name.includes('sell-usdt') || c.name === 'sell'
+                    ));
+                    for (const ch of portalChannels.values()) {
+                        const msgs = await ch.messages.fetch({ limit: 50 }).catch(() => null);
+                        if (msgs) {
+                            const userMsgs = msgs.filter(m => m.author.id === interaction.user.id);
+                            for (const m of userMsgs.values()) {
+                                await m.delete().catch(() => null);
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                logger.error('Failed to clear user portal messages:', err);
+            }
+
             setTimeout(async () => {
                 await interaction.deleteReply().catch(() => null);
             }, 3000);
