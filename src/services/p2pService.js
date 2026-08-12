@@ -98,16 +98,18 @@ function formatTxHash(txHash) {
 /**
  * Builds payment instruction embed for BUY tickets based on payment method selected.
  */
-export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CONFIG, totalInr = null) {
+export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CONFIG, totalInr = null, receiveUsdt = null) {
     const method = (paymentMethod || '').toUpperCase();
     const embed = new EmbedBuilder().setColor('#2ECC71');
 
-    const amountLine = totalInr ? `💵 **Amount to Pay:** \`₹${totalInr.toFixed(2)} INR\`\n\n` : '';
+    const amountLine = totalInr ? `💵 **Amount to Pay:** \`₹${totalInr.toFixed(2)} INR\`\n` : '';
+    const receiveLine = receiveUsdt ? `🪙 **Net USDT You Receive:** \`${receiveUsdt.toFixed(2)} USDT\`\n\n` : (totalInr ? '\n' : '');
+    const headerLine = amountLine + receiveLine;
 
     if (method === 'UPI') {
         embed.setTitle('💳 Official UPI Payment Details')
             .setDescription(
-                amountLine +
+                headerLine +
                 `Please pay the exact amount using the UPI details below:\n\n` +
                 `> **UPI ID:** \`${config.upiId}\`\n\n` +
                 `📸 **Instruction:** Once payment is complete, please upload your **Payment Screenshot** in this ticket channel.`
@@ -118,7 +120,7 @@ export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CON
     } else if (method === 'IMPS') {
         embed.setTitle('🏦 Official IMPS Bank Transfer Details')
             .setDescription(
-                amountLine +
+                headerLine +
                 `Please transfer the exact amount via IMPS using the bank details below:\n\n` +
                 `> **Account Number:** \`${config.impsAccount}\`\n` +
                 `> **IFSC Code:** \`${config.impsIfsc}\`\n` +
@@ -128,7 +130,7 @@ export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CON
     } else if (method === 'CDM') {
         embed.setTitle('🏧 Official CDM Cash Deposit Details')
             .setDescription(
-                amountLine +
+                headerLine +
                 `Please deposit cash via CDM using the account details below:\n\n` +
                 `> **CDM Account:** \`${config.cdmAccount}\`\n\n` +
                 `📸 **Instruction:** Once cash deposit is complete, please upload your **CDM Deposit Receipt Screenshot** in this ticket channel.`

@@ -226,7 +226,8 @@ export const p2pDetailsModalHandler = {
             // 4. Auto-dispatch Payment QR Code / Bank Details or Deposit Wallet
             if (isBuy) {
                 const totalInr = amountVal * buyPrice;
-                const paymentEmbed = buildBuyPaymentEmbed(paymentMethod, paymentConfig, totalInr);
+                const receiveUsdt = isKyc ? (amountVal * 0.999) : (amountVal * 0.99);
+                const paymentEmbed = buildBuyPaymentEmbed(paymentMethod, paymentConfig, totalInr, receiveUsdt);
                 await ticketChannel.send({ embeds: [paymentEmbed] });
             } else {
                 const netUsdtForPayout = isKyc ? amountVal : (amountVal * 0.99);
