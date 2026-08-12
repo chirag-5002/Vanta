@@ -387,29 +387,83 @@ async function handleTicketPanel(interaction) {
     const channelOverride = interaction.options.getChannel('channel');
     const targetChannel = channelOverride || interaction.channel;
 
-    const panelEmbed = new EmbedBuilder()
-        .setTitle(customTitle)
-        .setDescription(
-            `Welcome to **${interaction.guild.name}** P2P Exchange Portal!\n\n` +
-            `Need to **Buy** or **Sell** USDT securely?\n` +
-            `Click one of the buttons below to open a private 1-on-1 Middleman Trade Ticket with our verified support team!\n\n` +
-            `• **🟢 Buy USDT:** Open ticket to buy USDT via INR/UPI/Bank.\n` +
-            `• **🔴 Sell USDT:** Open ticket to sell USDT and receive instant payout.\n\n` +
-            `*🛡️ All transactions are 100% protected by ICN Auto-MM Security.*`
-        )
-        .setColor('#FFC107')
-        .setFooter({ text: `${interaction.guild.name} • Official P2P Trade System` });
+    const channelName = targetChannel.name?.toLowerCase() || '';
+    const isBuyChannel = channelName.includes('buy') || channelName.includes('looking-to-buy');
+    const isSellChannel = channelName.includes('sell') || channelName.includes('looking-to-sell');
 
-    const buttonsRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('p2p_price_buy')
-            .setLabel('🟢 Buy USDT')
-            .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-            .setCustomId('p2p_price_sell')
-            .setLabel('🔴 Sell USDT')
-            .setStyle(ButtonStyle.Danger)
-    );
+    let panelEmbed, buttonsRow;
+
+    if (isBuyChannel) {
+        panelEmbed = new EmbedBuilder()
+            .setTitle(customTitle === '🛒 USDT P2P Trade Portal' ? '🟢 Buy USDT - P2P Portal' : customTitle)
+            .setDescription(
+                `Welcome to **${interaction.guild.name}** USDT Buying Portal!\n\n` +
+                `Select an option below to open an instant 1-on-1 Middleman Buy Ticket:\n\n` +
+                `• **🟢 Buy with KYC:** KYC Verified trade with higher limits.\n` +
+                `• **🟢 Buy without KYC:** Instant Non-KYC quick trade.\n\n` +
+                `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
+            )
+            .setColor('#2ECC71')
+            .setFooter({ text: `${interaction.guild.name} • Official P2P Buy Portal` });
+
+        buttonsRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('p2p_trade_buy_kyc')
+                .setLabel('🟢 Buy with KYC')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId('p2p_trade_buy_nokyc')
+                .setLabel('🟢 Buy without KYC')
+                .setStyle(ButtonStyle.Primary)
+        );
+    } else if (isSellChannel) {
+        panelEmbed = new EmbedBuilder()
+            .setTitle(customTitle === '🛒 USDT P2P Trade Portal' ? '🔴 Sell USDT - P2P Portal' : customTitle)
+            .setDescription(
+                `Welcome to **${interaction.guild.name}** USDT Selling Portal!\n\n` +
+                `Select an option below to open an instant 1-on-1 Middleman Sell Ticket:\n\n` +
+                `• **🔴 Sell with KYC:** Fast payout for KYC Verified sellers.\n` +
+                `• **🔴 Sell without KYC:** Instant Non-KYC sell trade.\n\n` +
+                `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
+            )
+            .setColor('#E74C3C')
+            .setFooter({ text: `${interaction.guild.name} • Official P2P Sell Portal` });
+
+        buttonsRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('p2p_trade_sell_kyc')
+                .setLabel('🔴 Sell with KYC')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId('p2p_trade_sell_nokyc')
+                .setLabel('🔴 Sell without KYC')
+                .setStyle(ButtonStyle.Secondary)
+        );
+    } else {
+        panelEmbed = new EmbedBuilder()
+            .setTitle(customTitle)
+            .setDescription(
+                `Welcome to **${interaction.guild.name}** P2P Exchange Portal!\n\n` +
+                `Need to **Buy** or **Sell** USDT securely?\n` +
+                `Click one of the buttons below to open a private 1-on-1 Middleman Trade Ticket with our verified support team!\n\n` +
+                `• **🟢 Buy USDT:** Open ticket to buy USDT via INR/UPI/Bank.\n` +
+                `• **🔴 Sell USDT:** Open ticket to sell USDT and receive instant payout.\n\n` +
+                `*🛡️ All transactions are 100% protected by ICN Auto-MM Security.*`
+            )
+            .setColor('#FFC107')
+            .setFooter({ text: `${interaction.guild.name} • Official P2P Trade System` });
+
+        buttonsRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('p2p_price_buy')
+                .setLabel('🟢 Buy USDT')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId('p2p_price_sell')
+                .setLabel('🔴 Sell USDT')
+                .setStyle(ButtonStyle.Danger)
+        );
+    }
 
     try {
         await targetChannel.send({
