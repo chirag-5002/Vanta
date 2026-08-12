@@ -517,12 +517,19 @@ export async function sendVouchMessagesAndScheduleClose(channel, dealRecord) {
     if (!isTicket) return;
 
     // Message 1: Vouch/Feedback request
+    const guildChannels = await channel.guild.channels.fetch().catch(() => null) || channel.guild.channels.cache;
+    const snapsChannel = guildChannels.find(c => 
+        c && c.type === ChannelType.GuildText && 
+        (c.name.toLowerCase().includes('snap') || c.name.toLowerCase().includes('screenshot'))
+    );
+
     const successEmbedObj = new EmbedBuilder()
         .setTitle('🎉 Transaction Complete')
         .setDescription(
             `Thank you for trading with **ICN**! 🎉\n\n` +
-            `The trade of **${dealRecord.usdtAmount} USDT** has been marked as complete and logged.\n` +
-            `Please click the button below to **Submit Vouch / Feedback** about your experience.`
+            `The trade of **${dealRecord.usdtAmount} USDT** has been marked as complete and logged.\n\n` +
+            `• **⭐ Submit Vouch:** Please click below to submit feedback about your experience.\n` +
+            `• **📸 Share Snaps:** Please click below to upload your payment screenshot/receipt in the ${snapsChannel ? `<#${snapsChannel.id}>` : '#transaction-snaps'} channel.`
         )
         .setColor('#2ECC71')
         .setTimestamp();
@@ -535,36 +542,15 @@ export async function sendVouchMessagesAndScheduleClose(channel, dealRecord) {
             .setStyle(ButtonStyle.Primary)
     );
 
-    await channel.send({
-        embeds: [successEmbedObj],
-        components: [ticketComponents]
-    }).catch(() => null);
-
-    // Message 2: Share screenshots/receipts in #transaction-snaps
-    const guildChannels = await channel.guild.channels.fetch().catch(() => null) || channel.guild.channels.cache;
-    const snapsChannel = guildChannels.find(c => 
-        c && c.type === ChannelType.GuildText && 
-        (c.name.toLowerCase() === 'transaction-snaps' || c.name.toLowerCase().includes('transaction-snaps'))
-    );
-
-    const snapsEmbed = new EmbedBuilder()
-        .setTitle('📸 Share Transaction Screenshot / Snap')
-        .setDescription(
-            `To keep our community safe and transparent, please upload your **payment proof, receipt, or transaction screenshot** in the ${snapsChannel ? `<#${snapsChannel.id}>` : '#transaction-snaps'} channel.`
-        )
-        .setColor('#3498DB')
-        .setTimestamp();
-
-    const snapsComponents = new ActionRowBuilder();
     if (snapsChannel) {
-        snapsComponents.addComponents(
+        ticketComponents.addComponents(
             new ButtonBuilder()
                 .setLabel('📸 Go to #transaction-snaps')
                 .setStyle(ButtonStyle.Link)
                 .setUrl(`https://discord.com/channels/${channel.guild.id}/${snapsChannel.id}`)
-            );
+        );
     } else {
-        snapsComponents.addComponents(
+        ticketComponents.addComponents(
             new ButtonBuilder()
                 .setCustomId('p2p_snaps_not_found')
                 .setLabel('📸 Share Screenshots')
@@ -574,8 +560,8 @@ export async function sendVouchMessagesAndScheduleClose(channel, dealRecord) {
     }
 
     await channel.send({
-        embeds: [snapsEmbed],
-        components: [snapsComponents]
+        embeds: [successEmbedObj],
+        components: [ticketComponents]
     }).catch(() => null);
 
     // Schedule auto-close in 30 minutes (1800000 ms)
