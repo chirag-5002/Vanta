@@ -98,13 +98,16 @@ function formatTxHash(txHash) {
 /**
  * Builds payment instruction embed for BUY tickets based on payment method selected.
  */
-export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CONFIG) {
+export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CONFIG, totalInr = null) {
     const method = (paymentMethod || '').toUpperCase();
     const embed = new EmbedBuilder().setColor('#2ECC71');
+
+    const amountLine = totalInr ? `💵 **Amount to Pay:** \`₹${totalInr.toFixed(2)} INR\`\n\n` : '';
 
     if (method === 'UPI') {
         embed.setTitle('💳 Official UPI Payment Details')
             .setDescription(
+                amountLine +
                 `Please pay the exact amount using the UPI details below:\n\n` +
                 `> **UPI ID:** \`${config.upiId}\`\n\n` +
                 `📸 **Instruction:** Once payment is complete, please upload your **Payment Screenshot** in this ticket channel.`
@@ -115,6 +118,7 @@ export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CON
     } else if (method === 'IMPS') {
         embed.setTitle('🏦 Official IMPS Bank Transfer Details')
             .setDescription(
+                amountLine +
                 `Please transfer the exact amount via IMPS using the bank details below:\n\n` +
                 `> **Account Number:** \`${config.impsAccount}\`\n` +
                 `> **IFSC Code:** \`${config.impsIfsc}\`\n` +
@@ -124,6 +128,7 @@ export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CON
     } else if (method === 'CDM') {
         embed.setTitle('🏧 Official CDM Cash Deposit Details')
             .setDescription(
+                amountLine +
                 `Please deposit cash via CDM using the account details below:\n\n` +
                 `> **CDM Account:** \`${config.cdmAccount}\`\n\n` +
                 `📸 **Instruction:** Once cash deposit is complete, please upload your **CDM Deposit Receipt Screenshot** in this ticket channel.`
@@ -143,7 +148,7 @@ export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CON
 /**
  * Builds deposit wallet instruction embed for SELL tickets based on network selected.
  */
-export function buildSellPaymentEmbed(network, config = DEFAULT_PAYMENT_CONFIG) {
+export function buildSellPaymentEmbed(network, config = DEFAULT_PAYMENT_CONFIG, amountVal = null, totalInrPayout = null) {
     const net = (network || '').toUpperCase();
     const embed = new EmbedBuilder().setColor('#E74C3C');
 
@@ -167,8 +172,13 @@ export function buildSellPaymentEmbed(network, config = DEFAULT_PAYMENT_CONFIG) 
         label = 'USDC (BEP20)';
     }
 
+    const amountLine = amountVal ? `🪙 **USDT to Deposit:** \`${amountVal.toFixed(2)} USDT\`\n` : '';
+    const payoutLine = totalInrPayout ? `💵 **Expected Payout:** \`₹${totalInrPayout.toFixed(2)} INR\`\n\n` : '\n';
+
     embed.setTitle(`📥 Official Deposit Wallet for ${label}`)
         .setDescription(
+            amountLine +
+            payoutLine +
             `Please transfer your crypto to the official deposit wallet address below:\n\n` +
             `> **Network:** \`${label}\`\n` +
             `> **Deposit Address:** \`${walletAddress}\`\n\n` +
