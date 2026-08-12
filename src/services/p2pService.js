@@ -200,7 +200,7 @@ export async function autoDeployP2PPanels(guild) {
 
         if (buyChannel) {
             const msgs = await buyChannel.messages.fetch({ limit: 10 }).catch(() => null);
-            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_buy_kyc')) && m.embeds.some(e => e.description?.includes('Buy with KYC')));
+            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_buy_kyc')) && m.embeds.some(e => e.description?.includes('0.1% fee')));
             
             if (!botHasNewPanel) {
                 if (msgs) {
@@ -239,7 +239,7 @@ export async function autoDeployP2PPanels(guild) {
 
         if (sellChannel) {
             const msgs = await sellChannel.messages.fetch({ limit: 10 }).catch(() => null);
-            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_sell_kyc')) && m.embeds.some(e => e.description?.includes('Sell with KYC')));
+            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_sell_kyc')) && m.embeds.some(e => e.description?.includes('₹100 network fee')));
 
             if (!botHasNewPanel) {
                 if (msgs) {
