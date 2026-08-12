@@ -291,13 +291,7 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
       }, deleteDelayMs);
     }
 
-    // Auto-detect and publish P2P deal proof automatically on ticket close
-    try {
-      const { autoDetectAndPublishDeal } = await import('./p2pService.js');
-      await autoDetectAndPublishDeal(channel, channel.guild.id, closer.id);
-    } catch (p2pErr) {
-      logger.warn(`Auto P2P deal publishing on ticket close skipped: ${p2pErr.message}`);
-    }
+
 
     if (closedCategoryId && channel.parentId !== closedCategoryId) {
       const closedCategory = channel.guild.channels.cache.get(closedCategoryId)
