@@ -478,10 +478,10 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
     // Send simple status notification to the public KYC portal channel
     await sendSimplePortalLog(guild, userId, true).catch(() => null);
 
-    // Auto-close ticket after 20 minutes, then auto-delete after 5 minutes
+    // Auto-close ticket after 10 minutes, then auto-delete after 5 minutes
     if (interaction && interaction.channel) {
         const channelId = interaction.channel.id;
-        const closeDelayMs = 20 * 60 * 1000; // 20 minutes
+        const closeDelayMs = 10 * 60 * 1000; // 10 minutes
         const deleteDelayMs = 5 * 60 * 1000; // 5 minutes
 
         setTimeout(async () => {
@@ -492,8 +492,8 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
 
                 const { closeTicket, deleteTicket } = await import('./ticket.js');
                 
-                await closeTicket(kycChannel, client.user, 'Auto-closed after 20 minutes of KYC approval.').catch(() => null);
-                logger.info(`Auto-closed approved KYC ticket channel ${kycChannel.id} after 20 minutes`);
+                await closeTicket(kycChannel, client.user, 'Auto-closed after 10 minutes of KYC approval.').catch(() => null);
+                logger.info(`Auto-closed approved KYC ticket channel ${kycChannel.id} after 10 minutes`);
 
                 setTimeout(async () => {
                     try {
@@ -639,10 +639,10 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
     // Send simple status notification to the public KYC portal channel
     await sendSimplePortalLog(guild, userId, false).catch(() => null);
 
-    // Auto-close ticket after 20 minutes, then auto-delete after 5 minutes
+    // Auto-close ticket after 10 minutes, then auto-delete after 5 minutes
     if (interaction && interaction.channel) {
         const channelId = interaction.channel.id;
-        const closeDelayMs = 20 * 60 * 1000; // 20 minutes
+        const closeDelayMs = 10 * 60 * 1000; // 10 minutes
         const deleteDelayMs = 5 * 60 * 1000; // 5 minutes
 
         setTimeout(async () => {
@@ -653,8 +653,8 @@ export async function rejectKyc(guild, userId, reason, staffMember, client, inte
 
                 const { closeTicket, deleteTicket } = await import('./ticket.js');
                 
-                await closeTicket(kycChannel, client.user, 'Auto-closed after 20 minutes of KYC rejection.').catch(() => null);
-                logger.info(`Auto-closed rejected KYC ticket channel ${kycChannel.id} after 20 minutes`);
+                await closeTicket(kycChannel, client.user, 'Auto-closed after 10 minutes of KYC rejection.').catch(() => null);
+                logger.info(`Auto-closed rejected KYC ticket channel ${kycChannel.id} after 10 minutes`);
 
                 setTimeout(async () => {
                     try {
