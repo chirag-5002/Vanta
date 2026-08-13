@@ -14,6 +14,16 @@ import {
   announceMilestoneCelebration
 } from '../../services/milestoneService.js';
 
+function drawProgressBar(value, max, size = 15) {
+    const percentage = Math.min(Math.max(value / max, 0), 1);
+    const progress = Math.round(size * percentage);
+    const emptyProgress = size - progress;
+    const progressText = '▰'.repeat(progress);
+    const emptyProgressText = '▱'.repeat(emptyProgress);
+    const percentageText = Math.round(percentage * 100);
+    return `\`${progressText}${emptyProgressText}\` **${percentageText}%**`;
+}
+
 export default {
     data: new SlashCommandBuilder()
         .setName('milestones')
@@ -22,7 +32,7 @@ export default {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('status')
-                .setDescription('View the current member count, next milestone, and reached milestones')
+                .setDescription('View the current member count, next milestone progress, and Hall of Fame')
         )
         .addSubcommand(subcommand =>
             subcommand
@@ -89,18 +99,41 @@ export default {
                 const currentMaxMilestone = eligible.length > 0 ? Math.max(...eligible) : 0;
                 const nextMilestone = currentMaxMilestone > 0 ? getNextMilestone(currentMaxMilestone) : 10;
 
+                // Calculate progress to next milestone
+                const previousVal = currentMaxMilestone;
+                const targetRange = nextMilestone - previousVal;
+                const offset = memberCount - previousVal;
+                const progressRange = targetRange > 0 ? targetRange : 1;
+                const progressBar = drawProgressBar(offset, progressRange);
+
+                // Build achieved milestones / Hall of Fame list
                 const reachedListText = reachedMilestones.length > 0
-                    ? reachedMilestones.sort((a, b) => a - b).map(m => `• **${m.toLocaleString()}** members`).join('\n')
+                    ? reachedMilestones
+                        .sort((a, b) => {
+                            const valA = typeof a === 'object' ? a.milestone : a;
+                            const valB = typeof b === 'object' ? b.milestone : b;
+                            return valA - valB;
+                        })
+                        .map(m => {
+                            if (typeof m === 'object') {
+                                const triggerUser = m.userId !== 'N/A' ? `<@${m.userId}>` : `*${m.userTag}*`;
+                                const dateStr = m.reachedAt ? `<t:${Math.floor(new Date(m.reachedAt).getTime() / 1000)}:d>` : '';
+                                return `• 🏆 **${m.milestone.toLocaleString()}** members — Triggered by ${triggerUser} ${dateStr}`;
+                            }
+                            return `• 🏆 **${m.toLocaleString()}** members`;
+                        })
+                        .join('\n')
                     : '*No milestones recorded yet*';
 
                 const embed = createEmbed({
-                    title: '📊 Server Milestones Status',
+                    title: '📊 Server Milestones & Hall of Fame',
                     color: getColor('info', '#3498DB'),
                     description: 
                         `**Current Member Count:** \`${memberCount.toLocaleString()}\`\n` +
-                        `**Milestone Channel:** ${channelMention}\n` +
-                        `**Next Milestone Target:** \`${nextMilestone.toLocaleString()}\` members\n\n` +
-                        `🏆 **Achieved Milestones:**\n${reachedListText}`
+                        `**Milestone Channel:** ${channelMention}\n\n` +
+                        `✨ **Progress to ${nextMilestone.toLocaleString()} members:**\n` +
+                        `${progressBar} (\`${memberCount.toLocaleString()}\` / \`${nextMilestone.toLocaleString()}\`)\n\n` +
+                        `🏆 **Milestones Hall of Fame:**\n${reachedListText}`
                 });
 
                 await InteractionHelper.safeEditReply(interaction, { embeds: [embed] }).catch(logger.error);
@@ -128,8 +161,6 @@ export default {
             if (subcommand === 'announce') {
                 const milestoneValue = options.getInteger('milestone');
                 const memberCount = guild.memberCount;
-                
-                // Let's generate next milestone target for the manual celebration card
                 const nextMilestone = getNextMilestone(milestoneValue);
 
                 const success = await announceMilestoneCelebration(guild, client, milestoneValue, memberCount, interaction.member, nextMilestone);
@@ -138,8 +169,16 @@ export default {
                     // Update reached database to prevent duplicate automatic announcement later
                     const reachedKey = getReachedMilestonesKey(guild.id);
                     const reachedMilestones = unwrapReplitData(await client.db.get(reachedKey)) || [];
-                    if (!reachedMilestones.includes(milestoneValue)) {
-                        reachedMilestones.push(milestoneValue);
+                    const reachedNumbers = reachedMilestones.map(m => typeof m === 'object' ? m.milestone : m);
+
+                    if (!reachedNumbers.includes(milestoneValue)) {
+                        reachedMilestones.push({
+                          milestone: milestoneValue,
+                          userId: interaction.user.id,
+                          userTag: interaction.user.tag,
+                          userAvatar: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
+                          reachedAt: new Date().toISOString()
+                        });
                         await client.db.set(reachedKey, reachedMilestones);
                     }
 

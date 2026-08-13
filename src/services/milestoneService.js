@@ -3,6 +3,7 @@ import { logger } from '../utils/logger.js';
 import { getColor } from '../config/bot.js';
 import { unwrapReplitData } from '../utils/database.js';
 import { logEvent, EVENT_TYPES } from './loggingService.js';
+import { generateMilestoneCard } from '../utils/milestoneCard.js';
 
 // Configuration keys
 export const getMilestoneChannelKey = (guildId) => `guild:${guildId}:milestone:channelId`;
@@ -98,12 +99,13 @@ export async function checkAndAnnounceMilestone(member) {
     const memberCount = guild.memberCount;
     const reachedKey = getReachedMilestonesKey(guild.id);
     const reachedMilestones = unwrapReplitData(await client.db.get(reachedKey)) || [];
+    const reachedNumbers = reachedMilestones.map(m => typeof m === 'object' ? m.milestone : m);
 
     // Find all milestones <= current count
     const eligibleMilestones = getMilestonesUpTo(memberCount);
     
     // Find unannounced ones
-    const unannounced = eligibleMilestones.filter(m => !reachedMilestones.includes(m));
+    const unannounced = eligibleMilestones.filter(m => !reachedNumbers.includes(m));
 
     if (unannounced.length === 0) {
       return; // No new milestone reached
@@ -113,15 +115,68 @@ export async function checkAndAnnounceMilestone(member) {
     const newMilestone = Math.max(...unannounced);
     const nextMilestone = getNextMilestone(newMilestone);
 
+    // Assign the "Milestone Legend" role to the triggering member
+    await assignMilestoneLegendRole(guild, member);
+
+    // Prepare full metadata object for the new milestone
+    const newRecord = {
+      milestone: newMilestone,
+      userId: member.user.id,
+      userTag: member.user.tag,
+      userAvatar: member.user.displayAvatarURL({ extension: 'png', size: 128 }),
+      reachedAt: new Date().toISOString()
+    };
+
     // Update DB: mark this milestone and all smaller ones as reached
-    const updatedReached = [...new Set([...reachedMilestones, ...eligibleMilestones])];
+    const updatedReached = [...reachedMilestones];
+    
+    // Add the new milestone object
+    updatedReached.push(newRecord);
+    
+    // Mark any smaller/skipped milestones as resolved (with N/A metadata)
+    for (const m of eligibleMilestones) {
+      if (m < newMilestone && !reachedNumbers.includes(m)) {
+        updatedReached.push({
+          milestone: m,
+          userId: 'N/A',
+          userTag: 'System/Imported',
+          userAvatar: null,
+          reachedAt: new Date().toISOString()
+        });
+      }
+    }
+
     await client.db.set(reachedKey, updatedReached);
 
-    // Announce the milestone celebration
+    // Announce the milestone celebration with the glowing canvas image!
     await announceMilestoneCelebration(guild, client, newMilestone, memberCount, member, nextMilestone);
 
   } catch (error) {
     logger.error('Error in checkAndAnnounceMilestone:', error);
+  }
+}
+
+/**
+ * Assigns or creates a special gold role for the triggering member
+ */
+async function assignMilestoneLegendRole(guild, member) {
+  if (!member) return;
+  try {
+    let milestoneRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'milestone legend');
+    if (!milestoneRole) {
+      milestoneRole = await guild.roles.create({
+        name: 'Milestone Legend',
+        color: '#FFD700', // Gold
+        hoist: true,
+        reason: 'Role created for members who trigger a server milestone'
+      });
+      logger.info(`Auto-created "Milestone Legend" role in guild ${guild.name}`);
+    }
+
+    await member.roles.add(milestoneRole);
+    logger.info(`Assigned Milestone Legend role to user ${member.user.tag}`);
+  } catch (err) {
+    logger.warn(`Could not manage/assign Milestone Legend role in guild ${guild.id}: ${err.message}`);
   }
 }
 
@@ -135,25 +190,34 @@ export async function announceMilestoneCelebration(guild, client, milestone, mem
     return false;
   }
 
-  const celebrationEmbed = new EmbedBuilder()
-    .setColor(getColor('success', '#F1C40F')) // Gold / Success color
-    .setTitle('🎉 SERVER MILESTONE ACHIEVED! 🎉')
-    .setDescription(
-      `### We have officially reached **${milestone.toLocaleString()}** members!\n\n` +
-      `A huge thank you to our **${memberCount.toLocaleString()}th** member, ${member ? member.toString() : 'someone special'}! ` +
-      `We are incredibly grateful for each and every one of you. Our community is growing stronger every single day! 🚀\n\n` +
-      `✨ **Next Milestone:** \`${nextMilestone.toLocaleString()}\` members! ✨`
-    )
-    .setThumbnail(guild.iconURL({ dynamic: true }) || (member ? member.user.displayAvatarURL() : null))
-    .addFields(
-      { name: '📊 Total Members', value: `\`${memberCount.toLocaleString()}\``, inline: true },
-      { name: '📅 Reached On', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
-    )
-    .setFooter({ text: `${guild.name} • Milestones`, iconURL: guild.iconURL({ dynamic: true }) || undefined })
-    .setTimestamp();
-
+  // Defer generation of the card
   try {
-    const celebrationMsg = await channel.send({ embeds: [celebrationEmbed] });
+    const avatarUrl = member ? member.user.displayAvatarURL({ extension: 'png', size: 256 }) : null;
+    const username = member ? member.user.username : 'Special Guest';
+    const guildIconUrl = guild.iconURL({ extension: 'png', size: 256 });
+
+    // Generate custom canvas card
+    const attachment = await generateMilestoneCard(
+      avatarUrl,
+      username,
+      guild.name,
+      guildIconUrl,
+      milestone
+    );
+
+    const celebrationEmbed = new EmbedBuilder()
+      .setColor(getColor('success', '#F1C40F')) // Gold / Success color
+      .setTitle('🎉 SERVER MILESTONE ACHIEVED! 🎉')
+      .setDescription(
+        `### We have officially reached **${milestone.toLocaleString()}** members!\n\n` +
+        `A huge thank you to our **${memberCount.toLocaleString()}th** member, ${member ? member.toString() : 'someone special'}! ` +
+        `We are incredibly grateful for each and every one of you. Our community is growing stronger every single day! 🚀\n\n` +
+        `🏆 **Next Milestone Goal:** \`${nextMilestone.toLocaleString()}\` members! Can we make it?`
+      )
+      .setImage(`attachment://milestone-${milestone}.png`)
+      .setTimestamp();
+
+    const celebrationMsg = await channel.send({ embeds: [celebrationEmbed], files: [attachment] });
     
     // Attempt to pin the celebration message for extra premium feel
     await celebrationMsg.pin().catch(() => null);
