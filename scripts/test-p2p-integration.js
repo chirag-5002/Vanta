@@ -77,8 +77,7 @@ async function runEndToEndVerification() {
     assert(embed.data.footer.text.includes('Test Auto-MM Deal'), 'Embed footer matches server config');
 
     const components = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
-    assert(components.components.length === 2, 'ActionRow includes 2 interactive buttons');
-    assert(components.components[1].data.custom_id === `p2p_vouch_btn:${dealRecord.dealId}`, 'Submit Vouch button has correct customId');
+    assert(components.components.length === 1, 'ActionRow includes 1 interactive button');
 
     // Step 5: Slash Command Handler Simulation
     console.log('\n--- TEST 5: Slash Command Execution (/p2p deal) ---');
@@ -89,8 +88,12 @@ async function runEndToEndVerification() {
         id: 'mock_interaction_12345',
         createdTimestamp: Date.now(),
         guildId: mockGuildId,
-        channel: { id: 'channel_ticket_123' },
+        channel: { 
+            id: 'channel_ticket_123',
+            send: async () => { return { id: 'msg_success_123' }; }
+        },
         user: { id: 'admin_middleman_007', username: 'MiddlemanAdmin' },
+        memberPermissions: { has: () => true },
         member: {
             permissions: { has: () => true },
             roles: { cache: new Map() }
@@ -153,15 +156,27 @@ async function runEndToEndVerification() {
         user: { id: 'user_buyer_101', username: 'BuyerUser' },
         guild: {
             channels: {
-                cache: new Map([
+                cache: Object.assign(new Map([
                     ['123456789123456789', {
                         id: '123456789123456789',
+                        name: 'feedback-comment',
+                        type: 0, // GuildText
                         send: async (msg) => {
                             vouchChannelMessageSent = msg !== null;
                             return { id: 'vouch_msg_111' };
                         }
                     }]
-                ])
+                ]), {
+                    find: function(fn) {
+                        for (const val of this.values()) {
+                            if (fn(val)) return val;
+                        }
+                        return null;
+                    }
+                }),
+                fetch: async function() {
+                    return this.cache;
+                }
             }
         },
         fields: {

@@ -53,8 +53,8 @@ export const p2pTradeButtonHandler = {
 
         const amountInput = new TextInputBuilder()
             .setCustomId('q1_amount')
-            .setLabel(`How much USDT do you want to ${isBuy ? 'BUY' : 'SELL'}?`)
-            .setPlaceholder('e.g. 100, 500, or 2500')
+            .setLabel(`How much USDT to ${isBuy ? 'BUY' : 'SELL'}? (Min. 100)`)
+            .setPlaceholder('Minimum 100 USDT (e.g. 150, 500)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true);
 

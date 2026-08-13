@@ -4,6 +4,7 @@ import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPayme
 import { logger } from '../../../utils/logger.js';
 import { errorEmbed } from '../../../utils/embeds.js';
 import { wizardSelections, buildWizardComponents } from '../../selectMenus/p2p/p2pWizardSelect.js';
+import { ErrorTypes, replyUserError } from '../../../utils/errorHandler.js';
 
 function safeGetField(fields, ...keys) {
     if (!fields) return null;
@@ -28,7 +29,25 @@ export const p2pAmountModalHandler = {
         const isBuy = tradeType === 'buy';
         const isKyc = kycType === 'kyc';
 
-        const amount = safeGetField(interaction.fields, 'q1_amount') || '100';
+        const amountRaw = safeGetField(interaction.fields, 'q1_amount') || '';
+        const cleanedAmount = amountRaw.trim().replace(/^\$/, '');
+        const amountVal = parseFloat(cleanedAmount);
+
+        if (isNaN(amountVal)) {
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: '❌ Please enter a valid number for the USDT amount.'
+            });
+        }
+
+        if (amountVal < 100) {
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: '❌ The minimum trading amount is **100 USDT**. Please enter a value of 100 or greater.'
+            });
+        }
+
+        const amount = amountVal.toString();
 
         // Store amount in wizard selections
         const key = `${interaction.guildId}:${interaction.user.id}`;
