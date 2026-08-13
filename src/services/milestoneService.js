@@ -180,6 +180,21 @@ async function assignMilestoneLegendRole(guild, member) {
   }
 }
 
+function getOrdinalSuffix(num) {
+  const j = num % 10;
+  const k = num % 100;
+  if (j === 1 && k !== 11) {
+    return "st";
+  }
+  if (j === 2 && k !== 12) {
+    return "nd";
+  }
+  if (j === 3 && k !== 13) {
+    return "rd";
+  }
+  return "th";
+}
+
 /**
  * Prepares and sends the celebration embed.
  */
@@ -205,12 +220,13 @@ export async function announceMilestoneCelebration(guild, client, milestone, mem
       milestone
     );
 
+    const suffix = getOrdinalSuffix(milestone);
     const celebrationEmbed = new EmbedBuilder()
       .setColor(getColor('success', '#F1C40F')) // Gold / Success color
       .setTitle('🎉 SERVER MILESTONE ACHIEVED! 🎉')
       .setDescription(
         `### We have officially reached **${milestone.toLocaleString()}** members!\n\n` +
-        `A huge thank you to our **${memberCount.toLocaleString()}th** member, ${member ? member.toString() : 'someone special'}! ` +
+        `A huge thank you to our **${milestone.toLocaleString()}${suffix}** member, ${member ? member.toString() : 'someone special'}! ` +
         `We are incredibly grateful for each and every one of you. Our community is growing stronger every single day! 🚀\n\n` +
         `🏆 **Next Milestone Goal:** \`${nextMilestone.toLocaleString()}\` members! Can we make it?`
       )
