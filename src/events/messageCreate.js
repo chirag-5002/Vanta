@@ -27,7 +27,7 @@ const spamTrackers = new Map();
 const SPAM_MAX_MESSAGES = 5;
 const SPAM_WINDOW_MS = 4000;
 const SPAM_MAX_DUPLICATES = 4;
-const TIMEOUT_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const TIMEOUT_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 export default {
   name: Events.MessageCreate,
@@ -109,7 +109,7 @@ export default {
 
                 // Send warning notification in channel (deletes in 10s)
                 const warnMsg = await message.channel.send({
-                  content: `⚠️ **Anti-Spam System:** <@${userId}> has been timed out (muted) for 24 hours due to spamming in this channel.`
+                  content: `⚠️ **Anti-Spam System:** <@${userId}> has been timed out (muted) for 2 hours due to spamming in this channel.`
                 }).catch(() => null);
 
                 if (warnMsg) {
@@ -132,7 +132,7 @@ export default {
                       .setDescription(
                         `**User:** <@${userId}> (${message.author.tag})\n` +
                         `**User ID:** \`${userId}\`\n` +
-                        `**Action:** Timed Out (24 Hours)\n` +
+                        `**Action:** Timed Out (2 Hours)\n` +
                         `**Channel:** <#${message.channel.id}>\n` +
                         `**Reason:** ${spamReason}\n` +
                         `**Timestamp:** <t:${Math.floor(Date.now() / 1000)}:F>`
