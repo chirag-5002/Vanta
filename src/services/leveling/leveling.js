@@ -6,6 +6,7 @@ import { getGuildConfig, setGuildConfig } from '../config/guildConfig.js';
 import { TitanBotError, ErrorTypes } from '../../utils/errorHandler.js';
 import { addXp } from './xpSystem.js';
 import { getUserLevelKey } from '../../utils/database/keys.js';
+import { isFeatureEnabled } from '../../config/bot.js';
 
 const BASE_XP = 100;
 const XP_MULTIPLIER = 1.5;
@@ -149,9 +150,24 @@ export function createLeaderboardEmbed(leaderboard, guild) {
 
 export async function getLevelingConfig(client, guildId) {
   try {
+    if (!isFeatureEnabled('leveling')) {
+      return {
+        enabled: false,
+        xpPerMessage: { min: 15, max: 25 },
+        xpCooldown: 20,
+        levelUpMessage: '{user} has leveled up to level {level}!',
+        levelUpChannel: null,
+        ignoredChannels: [],
+        ignoredRoles: [],
+        blacklistedUsers: [],
+        roleRewards: {},
+        announceLevelUp: false,
+        xpMultiplier: 1
+      };
+    }
     const guildConfig = await getGuildConfig(client, guildId);
     return guildConfig.leveling || {
-      enabled: true,
+      enabled: false,
       xpPerMessage: { min: 15, max: 25 },
       xpCooldown: 20,
       levelUpMessage: '{user} has leveled up to level {level}!',
@@ -160,13 +176,13 @@ export async function getLevelingConfig(client, guildId) {
       ignoredRoles: [],
       blacklistedUsers: [],
       roleRewards: {},
-      announceLevelUp: true,
+      announceLevelUp: false,
       xpMultiplier: 1
     };
   } catch (error) {
     logger.error(`Error getting leveling config for guild ${guildId}:`, error);
     return {
-      enabled: true,
+      enabled: false,
       xpPerMessage: { min: 15, max: 25 },
       xpCooldown: 20,
       levelUpMessage: '{user} has leveled up to level {level}!',
@@ -175,7 +191,7 @@ export async function getLevelingConfig(client, guildId) {
       ignoredRoles: [],
       blacklistedUsers: [],
       roleRewards: {},
-      announceLevelUp: true,
+      announceLevelUp: false,
       xpMultiplier: 1
     };
   }

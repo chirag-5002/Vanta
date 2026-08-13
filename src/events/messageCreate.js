@@ -212,7 +212,7 @@ export default {
 
       await handleReceiptUpload(message, client);
 
-      await handleLeveling(message, client);
+      // await handleLeveling(message, client);
     } catch (error) {
       logger.error('Error in messageCreate event:', error);
     }
