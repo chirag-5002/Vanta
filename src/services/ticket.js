@@ -10,7 +10,7 @@ import {
 } from 'discord.js';
 import { buildStandardLogEmbed, formatLogLine } from '../utils/logging/logEmbeds.js';
 import { getGuildConfig } from './config/guildConfig.js';
-import { getTicketData, saveTicketData, deleteTicketData, getOpenTicketCountForUser, incrementTicketCounter } from '../utils/database.js';
+import { getTicketData, saveTicketData, deleteTicketData, getOpenTicketCountForUser, incrementTicketCounter, getFromDb, setInDb } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 import { createEmbed, errorEmbed } from '../utils/embeds.js';
 import { logTicketEvent } from '../utils/ticket/ticketLogging.js';
@@ -253,6 +253,30 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
     ticketData.closedAt = new Date().toISOString();
     await saveTicketData(channel.guild.id, channel.id, ticketData);
 
+    // P2P Ticket Timepass Tracking & Ban Logic
+    const isP2pTicket = ticketData.reason?.startsWith('Buy') || ticketData.reason?.startsWith('Sell');
+    let isBannedNow = false;
+    let banExpiresStr = '';
+
+    if (isP2pTicket) {
+      const isCompleted = ticketData.dealCompleted === true;
+      if (!isCompleted) {
+        // Closed without completing a deal -> Timepass!
+        const timepassKey = `guild:${channel.guild.id}:p2p:timepass_count:${ticketData.userId}`;
+        const timepassCount = (await getFromDb(timepassKey, 0)) + 1;
+        await setInDb(timepassKey, timepassCount);
+
+        if (timepassCount >= 4) {
+          // Ban from P2P for 5 days
+          const banDuration = 5 * 24 * 60 * 60 * 1000; // 5 days
+          const banUntil = Date.now() + banDuration;
+          await setInDb(`guild:${channel.guild.id}:p2p:ban_until:${ticketData.userId}`, banUntil);
+          isBannedNow = true;
+          banExpiresStr = `<t:${Math.floor(banUntil / 1000)}:F> (<t:${Math.floor(banUntil / 1000)}:R>)`;
+        }
+      }
+    }
+
     // Support query ticket: auto-delete 10 minutes after close
     const isSupportQuery = ticketData.reason?.toLowerCase().startsWith('support query') || 
                            channel.name.toLowerCase().startsWith('🔒-query-');
@@ -313,9 +337,15 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
       try {
         const ticketCreator = await channel.client.users.fetch(ticketData.userId).catch(() => null);
         if (ticketCreator) {
+          let dmDescription = `Your ticket **${channel.name}** has been closed.\n\n**Reason:** ${reason}\n**Closed by:** ${closer.tag}\n**Closed at:** <t:${Math.floor(Date.now() / 1000)}:F>\n\nThank you for using our support system! If you have any further questions, feel free to create a new ticket.`;
+
+          if (isBannedNow) {
+            dmDescription += `\n\n⚠️ **IMPORTANT NOTICE:** You have been banned from using the P2P systems for **5 days** because you created 4 P2P tickets without completing payments/transactions (Timepass).\n**Ban Expires:** ${banExpiresStr}`;
+          }
+
           const dmEmbed = createEmbed({
             title: '🎫 Your Ticket Has Been Closed',
-            description: `Your ticket **${channel.name}** has been closed.\n\n**Reason:** ${reason}\n**Closed by:** ${closer.tag}\n**Closed at:** <t:${Math.floor(Date.now() / 1000)}:F>\n\nThank you for using our support system! If you have any further questions, feel free to create a new ticket.`,
+            description: dmDescription,
             color: '#e74c3c',
             footer: { text: `Ticket ID: ${ticketData.id}` }
           });

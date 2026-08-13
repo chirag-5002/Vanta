@@ -1,5 +1,5 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, ChannelType } from 'discord.js';
-import { getFromDb, setInDb, getP2PConfigKey, getP2PDealsKey, getP2PDealKey, getP2PUserStatsKey, getTicketData } from '../utils/database.js';
+import { getFromDb, setInDb, getP2PConfigKey, getP2PDealsKey, getP2PDealKey, getP2PUserStatsKey, getTicketData, saveTicketData } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 
 export const DEFAULT_P2P_CONFIG = {
@@ -22,9 +22,6 @@ export const DEFAULT_PAYMENT_CONFIG = {
     trc20Wallet: 'T9xICNUSDTTRC20OfficialWalletAddress',
     erc20Wallet: '0x71C569ICNUSDTERC20OfficialWalletAddress',
     bep20Wallet: '0x71C569ICNUSDTBEP20OfficialWalletAddress',
-    usdcTrc20Wallet: 'T9xICNUSDCTRC20OfficialWalletAddress',
-    usdcErc20Wallet: '0x71C569ICNUSDCERC20OfficialWalletAddress',
-    usdcBep20Wallet: '0x71C569ICNUSDCBEP20OfficialWalletAddress',
 };
 
 /**
@@ -163,15 +160,6 @@ export function buildSellPaymentEmbed(network, config = DEFAULT_PAYMENT_CONFIG, 
     } else if (net.includes('USDT') && net.includes('BEP20')) {
         walletAddress = config.bep20Wallet;
         label = 'USDT (BEP20)';
-    } else if (net.includes('USDC') && net.includes('TRC20')) {
-        walletAddress = config.usdcTrc20Wallet;
-        label = 'USDC (TRC20)';
-    } else if (net.includes('USDC') && net.includes('ERC20')) {
-        walletAddress = config.usdcErc20Wallet;
-        label = 'USDC (ERC20)';
-    } else if (net.includes('USDC') && net.includes('BEP20')) {
-        walletAddress = config.usdcBep20Wallet;
-        label = 'USDC (BEP20)';
     }
 
     const amountLine = amountVal ? `🪙 **USDT to Deposit:** \`${amountVal.toFixed(2)} USDT\`\n` : '';
@@ -508,6 +496,15 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
 
     dealRecord.messageId = sentMsg.id;
     dealRecord.channelId = targetChannel.id;
+
+    // Mark ticket as completed in database
+    if (channel) {
+        const ticketData = await getTicketData(guildId, channel.id).catch(() => null);
+        if (ticketData) {
+            ticketData.dealCompleted = true;
+            await saveTicketData(guildId, channel.id, ticketData).catch(() => null);
+        }
+    }
 
     // Call helper to send vouch/snap redirect messages and schedule 30-min auto-close
     if (channel && channel.id !== targetChannel.id) {

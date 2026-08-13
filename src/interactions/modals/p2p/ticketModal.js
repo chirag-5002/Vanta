@@ -1,5 +1,6 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, MessageFlags, ChannelType } from 'discord.js';
 import { createTicket } from '../../../services/ticket.js';
+import { getFromDb, setInDb } from '../../../utils/database.js';
 import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed } from '../../../services/p2pService.js';
 import { logger } from '../../../utils/logger.js';
 import { errorEmbed } from '../../../utils/embeds.js';
@@ -28,6 +29,27 @@ export const p2pAmountModalHandler = {
         const kycType = args[1] || 'kyc';
         const isBuy = tradeType === 'buy';
         const isKyc = kycType === 'kyc';
+
+        // 1. Check if user is P2P banned
+        const banUntil = await getFromDb(`guild:${interaction.guildId}:p2p:ban_until:${interaction.user.id}`, 0);
+        if (banUntil && Date.now() < banUntil) {
+            const expiresTimestamp = Math.floor(banUntil / 1000);
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: `❌ **You are currently banned from using the P2P Buy/Sell systems.**\n\n**Reason:** Created multiple P2P tickets without completing payments/transactions (Timepass).\n**Banned Until:** <t:${expiresTimestamp}:F> (<t:${expiresTimestamp}:R>)`
+            });
+        }
+
+        // 2. Check daily P2P ticket limit (Max 3/day)
+        const today = new Date().toISOString().split('T')[0];
+        const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${interaction.user.id}:${today}`;
+        const dailyCount = await getFromDb(dailyTicketsKey, 0);
+        if (dailyCount >= 3) {
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: `❌ **Limit Exceeded:** You can create a maximum of **3 P2P tickets** (Buy/Sell combined) per day.\n\nYou have already created ${dailyCount} tickets today. Please try again tomorrow.`
+            });
+        }
 
         const amountRaw = safeGetField(interaction.fields, 'q1_amount') || '';
         const cleanedAmount = amountRaw.trim().replace(/^\$/, '');
@@ -138,6 +160,12 @@ export const p2pDetailsModalHandler = {
             );
 
             const ticketChannel = result.channel;
+
+            // Increment daily P2P ticket count
+            const today = new Date().toISOString().split('T')[0];
+            const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${interaction.user.id}:${today}`;
+            const dailyCount = await getFromDb(dailyTicketsKey, 0);
+            await setInDb(dailyTicketsKey, dailyCount + 1);
 
             // 2. Strict Permissions Setup
             const staffRoleId = config.staffRoleId;

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents } from '../../services/p2pService.js';
+import { getTicketData, saveTicketData } from '../../utils/database.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -616,6 +617,12 @@ async function handleAutoLog(interaction) {
         loggedBy: interaction.user.id
     });
 
+    const ticketData = await getTicketData(interaction.guildId, interaction.channel.id).catch(() => null);
+    if (ticketData) {
+        ticketData.dealCompleted = true;
+        await saveTicketData(interaction.guildId, interaction.channel.id, ticketData).catch(() => null);
+    }
+
     const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
@@ -754,6 +761,12 @@ async function handleDeal(interaction) {
         status,
         loggedBy: interaction.user.id
     });
+
+    const ticketData = await getTicketData(interaction.guildId, interaction.channel.id).catch(() => null);
+    if (ticketData) {
+        ticketData.dealCompleted = true;
+        await saveTicketData(interaction.guildId, interaction.channel.id, ticketData).catch(() => null);
+    }
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
     const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);

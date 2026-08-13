@@ -1,5 +1,6 @@
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { wizardSelections } from '../../selectMenus/p2p/p2pWizardSelect.js';
+import { getFromDb } from '../../../utils/database.js';
 import { logger } from '../../../utils/logger.js';
 
 // ==================== STEP 1: Show Amount Modal ====================
@@ -10,6 +11,27 @@ export const p2pTradeButtonHandler = {
         const tradeType = args[0] || 'buy';
         const kycType = args[1] || 'kyc';
         const isBuy = tradeType === 'buy';
+
+        // 1. Check if user is P2P banned
+        const banUntil = await getFromDb(`guild:${interaction.guildId}:p2p:ban_until:${interaction.user.id}`, 0);
+        if (banUntil && Date.now() < banUntil) {
+            const expiresTimestamp = Math.floor(banUntil / 1000);
+            return await interaction.reply({
+                content: `❌ **You are currently banned from using the P2P Buy/Sell systems.**\n\n**Reason:** Created multiple P2P tickets without completing payments/transactions (Timepass).\n**Banned Until:** <t:${expiresTimestamp}:F> (<t:${expiresTimestamp}:R>)`,
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        // 2. Check daily P2P ticket limit (Max 3/day)
+        const today = new Date().toISOString().split('T')[0];
+        const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${interaction.user.id}:${today}`;
+        const dailyCount = await getFromDb(dailyTicketsKey, 0);
+        if (dailyCount >= 3) {
+            return await interaction.reply({
+                content: `❌ **Limit Exceeded:** You can create a maximum of **3 P2P tickets** (Buy/Sell combined) per day.\n\nYou have already created ${dailyCount} tickets today. Please try again tomorrow.`,
+                flags: MessageFlags.Ephemeral
+            });
+        }
 
         // KYC check if required
         if (kycType === 'kyc') {
