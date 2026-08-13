@@ -97,7 +97,7 @@ export default {
 
                 const eligible = getMilestonesUpTo(memberCount);
                 const currentMaxMilestone = eligible.length > 0 ? Math.max(...eligible) : 0;
-                const nextMilestone = currentMaxMilestone > 0 ? getNextMilestone(currentMaxMilestone) : 10;
+                const nextMilestone = currentMaxMilestone > 0 ? getNextMilestone(currentMaxMilestone) : 200;
 
                 // Calculate progress to next milestone
                 const previousVal = currentMaxMilestone;

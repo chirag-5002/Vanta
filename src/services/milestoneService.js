@@ -9,33 +9,14 @@ import { generateMilestoneCard } from '../utils/milestoneCard.js';
 export const getMilestoneChannelKey = (guildId) => `guild:${guildId}:milestone:channelId`;
 export const getReachedMilestonesKey = (guildId) => `guild:${guildId}:milestone:reached`;
 
-/**
- * Dynamically generates standard milestones up to a given member count.
- * Includes small milestones for new/testing servers, and standard milestone steps thereafter.
- */
 export function getMilestonesUpTo(count) {
-  const milestones = [10, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
+  const milestones = [200, 500, 1000, 1500, 2000, 3000, 4000];
 
-  // From 1,000 to 5,000: steps of 500
-  for (let m = 1000; m <= 5000; m += 500) {
-    if (!milestones.includes(m)) milestones.push(m);
-  }
-
-  // From 5,000 to 20,000: steps of 1,000
-  for (let m = 6000; m <= 20000; m += 1000) {
-    if (!milestones.includes(m)) milestones.push(m);
-  }
-
-  // From 20,000 to 100,000: steps of 5,000
-  for (let m = 25000; m <= 100000; m += 5000) {
-    if (!milestones.includes(m)) milestones.push(m);
-  }
-
-  // Above 100,000: steps of 10,000
-  if (count > 100000) {
-    const step = 10000;
+  // From 4,000 onwards: steps of 1,000
+  if (count > 4000) {
+    const step = 1000;
     const limit = Math.ceil(count / step) * step + step;
-    for (let m = 110000; m <= limit; m += step) {
+    for (let m = 5000; m <= limit; m += step) {
       if (!milestones.includes(m)) milestones.push(m);
     }
   }
@@ -47,16 +28,17 @@ export function getMilestonesUpTo(count) {
  * Determines the next milestone targets.
  */
 export function getNextMilestone(currentMilestone) {
-  const list = getMilestonesUpTo(currentMilestone + 50000);
+  const list = getMilestonesUpTo(currentMilestone + 10000);
   const currentIndex = list.indexOf(currentMilestone);
   if (currentIndex !== -1 && currentIndex < list.length - 1) {
     return list[currentIndex + 1];
   }
-  // Fallbacks if not found
-  if (currentMilestone < 1000) return currentMilestone + 100;
-  if (currentMilestone < 5000) return currentMilestone + 500;
-  if (currentMilestone < 20000) return currentMilestone + 1000;
-  return currentMilestone + 5000;
+  // Fallbacks if not found in list
+  if (currentMilestone < 200) return 200;
+  if (currentMilestone < 500) return 500;
+  if (currentMilestone < 1000) return 1000;
+  if (currentMilestone < 2000) return currentMilestone + 500;
+  return currentMilestone + 1000;
 }
 
 /**
