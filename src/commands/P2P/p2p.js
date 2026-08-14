@@ -18,6 +18,15 @@ export default {
                 .setName('payments')
                 .setDescription('Configures UPI ID, Bank IMPS, CDM, and Crypto Deposit Wallets for automatic dispatch.')
                 .addStringOption(option =>
+                    option.setName('profile')
+                        .setDescription('Select preset profile to auto-fill (Amit/Naman)')
+                        .setRequired(false)
+                        .addChoices(
+                            { name: 'Amit', value: 'amit' },
+                            { name: 'Naman', value: 'naman' }
+                        )
+                )
+                .addStringOption(option =>
                     option.setName('upi_id')
                         .setDescription('UPI ID for Buy USDT payments (e.g. name@upi)')
                         .setRequired(false)
@@ -336,26 +345,51 @@ async function handlePaymentConfig(interaction) {
         });
     }
 
-    const upiId = interaction.options.getString('upi_id');
+    const profile = interaction.options.getString('profile');
+    
+    let defaultUpiId = null;
+    let defaultTrc20Wallet = null;
+    let defaultBep20Wallet = null;
+    let defaultImpsAccount = null;
+    let defaultImpsIfsc = null;
+    let defaultImpsName = null;
+
+    if (profile === 'amit') {
+        defaultUpiId = 'icn224@ibl';
+        defaultTrc20Wallet = 'TCpRGdPLdN2bm4aRtTqHpCbEw8Uh2h2rtT';
+        defaultBep20Wallet = '0xB6D7277EDEC09d6C40DE43f5A0C9CD02C66a1452';
+        defaultImpsAccount = '';
+        defaultImpsIfsc = '';
+        defaultImpsName = '';
+    } else if (profile === 'naman') {
+        defaultUpiId = 'innercircle20@ibl';
+        defaultTrc20Wallet = 'TXNmuva3aqWdiNLjtY7BxmKvLyZzvh3xqB';
+        defaultBep20Wallet = '0xA657efcF628E36c2DE486A95e804218897997326';
+        defaultImpsAccount = '4496001700126905';
+        defaultImpsIfsc = 'PUNB0448600';
+        defaultImpsName = 'Naman';
+    }
+
+    const upiId = interaction.options.getString('upi_id') ?? defaultUpiId;
     const upiQrUrl = interaction.options.getString('upi_qr_url');
-    const impsAccount = interaction.options.getString('imps_account');
-    const impsIfsc = interaction.options.getString('imps_ifsc');
-    const impsName = interaction.options.getString('imps_name');
+    const impsAccount = interaction.options.getString('imps_account') ?? defaultImpsAccount;
+    const impsIfsc = interaction.options.getString('imps_ifsc') ?? defaultImpsIfsc;
+    const impsName = interaction.options.getString('imps_name') ?? defaultImpsName;
     const cdmAccount = interaction.options.getString('cdm_account');
-    const trc20Wallet = interaction.options.getString('trc20_wallet');
+    const trc20Wallet = interaction.options.getString('trc20_wallet') ?? defaultTrc20Wallet;
     const erc20Wallet = interaction.options.getString('erc20_wallet');
-    const bep20Wallet = interaction.options.getString('bep20_wallet');
+    const bep20Wallet = interaction.options.getString('bep20_wallet') ?? defaultBep20Wallet;
 
     const updateObj = {};
-    if (upiId) updateObj.upiId = upiId;
-    if (upiQrUrl) updateObj.upiQrUrl = upiQrUrl;
-    if (impsAccount) updateObj.impsAccount = impsAccount;
-    if (impsIfsc) updateObj.impsIfsc = impsIfsc;
-    if (impsName) updateObj.impsName = impsName;
-    if (cdmAccount) updateObj.cdmAccount = cdmAccount;
-    if (trc20Wallet) updateObj.trc20Wallet = trc20Wallet;
-    if (erc20Wallet) updateObj.erc20Wallet = erc20Wallet;
-    if (bep20Wallet) updateObj.bep20Wallet = bep20Wallet;
+    if (upiId !== null) updateObj.upiId = upiId;
+    if (upiQrUrl !== null) updateObj.upiQrUrl = upiQrUrl;
+    if (impsAccount !== null) updateObj.impsAccount = impsAccount;
+    if (impsIfsc !== null) updateObj.impsIfsc = impsIfsc;
+    if (impsName !== null) updateObj.impsName = impsName;
+    if (cdmAccount !== null) updateObj.cdmAccount = cdmAccount;
+    if (trc20Wallet !== null) updateObj.trc20Wallet = trc20Wallet;
+    if (erc20Wallet !== null) updateObj.erc20Wallet = erc20Wallet;
+    if (bep20Wallet !== null) updateObj.bep20Wallet = bep20Wallet;
 
     if (Object.keys(updateObj).length === 0) {
         const current = await getP2PPaymentConfig(interaction.guildId);

@@ -11,17 +11,10 @@ export function buildWizardComponents(tradeType, kycType, selectedPayment = null
     const isBuy = tradeType === 'buy';
 
     // Payment Method Options
-    const paymentOptions = isBuy
-        ? [
-            { label: 'UPI', value: 'UPI', emoji: '📱' },
-            { label: 'IMPS', value: 'IMPS', emoji: '🏦' },
-            { label: 'CDM (Cash Deposit Machine)', value: 'CDM', emoji: '🏧' },
-            { label: 'CCW (Crypto-to-Crypto Swap)', value: 'CCW', emoji: '🔄' },
-        ]
-        : [
-            { label: 'UPI', value: 'UPI', emoji: '📱' },
-            { label: 'IMPS', value: 'IMPS', emoji: '🏦' },
-        ];
+    const paymentOptions = [
+        { label: 'UPI', value: 'UPI', emoji: '📱' },
+        { label: 'IMPS', value: 'IMPS', emoji: '🏦' },
+    ];
 
     // Set default value if selected
     const paymentOptionsMapped = paymentOptions.map(opt => ({
