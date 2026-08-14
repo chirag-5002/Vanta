@@ -37,7 +37,6 @@ export function buildWizardComponents(tradeType, kycType, selectedPayment = null
     // Network Options
     const networkOptions = [
         { label: 'USDT TRC20', value: 'USDT_TRC20', emoji: '🟢' },
-        { label: 'USDT ERC20', value: 'USDT_ERC20', emoji: '🔵' },
         { label: 'USDT BEP20', value: 'USDT_BEP20', emoji: '🟡' },
     ];
 
