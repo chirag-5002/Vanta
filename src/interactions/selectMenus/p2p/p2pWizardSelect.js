@@ -1,5 +1,6 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, MessageFlags } from 'discord.js';
 import { logger } from '../../../utils/logger.js';
+import { getP2PPaymentConfig } from '../../../services/p2pService.js';
 
 // Export memory store for transient select menu state
 export const wizardSelections = new Map();
@@ -7,14 +8,17 @@ export const wizardSelections = new Map();
 /**
  * Builds the interaction components with correct defaults set based on user selections.
  */
-export function buildWizardComponents(tradeType, kycType, selectedPayment = null, selectedNetwork = null) {
+export function buildWizardComponents(tradeType, kycType, selectedPayment = null, selectedNetwork = null, config = null) {
     const isBuy = tradeType === 'buy';
 
     // Payment Method Options
     const paymentOptions = [
         { label: 'UPI', value: 'UPI', emoji: '📱' },
-        { label: 'IMPS', value: 'IMPS', emoji: '🏦' },
     ];
+
+    if (!config || config.impsAccount) {
+        paymentOptions.push({ label: 'IMPS', value: 'IMPS', emoji: '🏦' });
+    }
 
     // Set default value if selected
     const paymentOptionsMapped = paymentOptions.map(opt => ({
@@ -89,7 +93,8 @@ export const selectPaymentHandler = {
         }
 
         // Rebuild components to show default selection in select menu
-        const updatedComponents = buildWizardComponents(tradeType, kycType, existing.paymentMethod, existing.network);
+        const config = await getP2PPaymentConfig(interaction.guildId);
+        const updatedComponents = buildWizardComponents(tradeType, kycType, existing.paymentMethod, existing.network, config);
 
         await interaction.update({
             content: status,
@@ -132,7 +137,8 @@ export const selectNetworkHandler = {
         }
 
         // Rebuild components to show default selection in select menu
-        const updatedComponents = buildWizardComponents(tradeType, kycType, existing.paymentMethod, existing.network);
+        const config = await getP2PPaymentConfig(interaction.guildId);
+        const updatedComponents = buildWizardComponents(tradeType, kycType, existing.paymentMethod, existing.network, config);
 
         await interaction.update({
             content: status,
