@@ -5,7 +5,7 @@ import { botConfig } from '../config/bot.js';
 import { logger } from '../utils/logger.js';
 import { getGuildConfig, setGuildConfig } from './config/guildConfig.js';
 import { createError, ErrorTypes } from '../utils/errorHandler.js';
-import { insertVerificationAudit } from '../utils/database.js';
+import { insertVerificationAudit, getFromDb, deleteFromDb } from '../utils/database.js';
 import { ensureTypedServiceError } from '../utils/serviceErrorBoundary.js';
 
 const verificationCooldowns = new Map();
@@ -93,6 +93,10 @@ export async function verifyUser(client, guildId, userId, options = {}) {
 
         await member.roles.add(verifiedRole.id, `User verified (${source})`);
 
+        // Clear left status on manual/normal verification
+        const hasLeftKey = `guild:${guildId}:user:${userId}:left`;
+        await deleteFromDb(hasLeftKey).catch(() => null);
+
         logVerificationAction(client, guildId, userId, 'verified', {
             source,
             roleId: verifiedRole.id,
@@ -176,7 +180,16 @@ function pruneVerificationTrackers(now = Date.now()) {
 
 export async function autoVerifyOnJoin(client, guild, member, verificationConfig) {
     try {
-        
+        // Block auto-verify if the user has left the server previously
+        const hasLeftKey = `guild:${guild.id}:user:${member.id}:left`;
+        const hasLeftBefore = await getFromDb(hasLeftKey, false);
+        if (hasLeftBefore) {
+            return {
+                autoVerified: false,
+                reason: 'user_previously_left_must_verify_manually'
+            };
+        }
+
         if (!verificationConfig.autoVerify?.enabled) {
             return {
                 autoVerified: false,

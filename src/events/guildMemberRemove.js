@@ -1,6 +1,6 @@
 import { Events, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { getColor, botConfig } from '../config/bot.js';
-import { getWelcomeConfig, getUserApplications, deleteApplication, deleteFromDb } from '../utils/database.js';
+import { getWelcomeConfig, getUserApplications, deleteApplication, deleteFromDb, setInDb } from '../utils/database.js';
 import { formatWelcomeMessage } from '../utils/welcome.js';
 import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
 import { getServerCounters, updateCounter } from '../services/serverstatsService.js';
@@ -150,6 +150,14 @@ export default {
             logger.debug(`Removed KYC verification data for user ${user.id} in guild ${guild.id}`);
         } catch (error) {
             logger.debug('Error removing KYC data on member leave:', error);
+        }
+
+        try {
+            const hasLeftKey = `guild:${guild.id}:user:${user.id}:left`;
+            await setInDb(hasLeftKey, true);
+            logger.debug(`Saved left status for user ${user.id} in guild ${guild.id}`);
+        } catch (error) {
+            logger.debug('Error saving left status on member leave:', error);
         }
         
     } catch (error) {
