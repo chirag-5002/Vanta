@@ -1,6 +1,6 @@
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { wizardSelections } from '../../selectMenus/p2p/p2pWizardSelect.js';
-import { getFromDb } from '../../../utils/database.js';
+import { getFromDb, getP2PUserStatsKey } from '../../../utils/database.js';
 import { logger } from '../../../utils/logger.js';
 
 // ==================== STEP 1: Show Amount Modal ====================
@@ -27,10 +27,16 @@ export const p2pTradeButtonHandler = {
         const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${interaction.user.id}:${today}`;
         const dailyCount = await getFromDb(dailyTicketsKey, 0);
         if (dailyCount >= 3) {
-            return await interaction.reply({
-                content: `❌ **Limit Exceeded:** You can create a maximum of **3 P2P tickets** (Buy/Sell combined) per day.\n\nYou have already created ${dailyCount} tickets today. Please try again tomorrow.`,
-                flags: MessageFlags.Ephemeral
-            });
+            const userStatsKey = getP2PUserStatsKey(interaction.guildId, interaction.user.id);
+            const stats = await getFromDb(userStatsKey, { completedDeals: 0 });
+            const completedDeals = stats?.completedDeals || 0;
+
+            if (completedDeals === 0) {
+                return await interaction.reply({
+                    content: `❌ **Limit Exceeded:** You can create a maximum of **3 P2P tickets** (Buy/Sell combined) per day.\n\nYou have already created ${dailyCount} tickets today. Please try again tomorrow.`,
+                    flags: MessageFlags.Ephemeral
+                });
+            }
         }
 
         // KYC check if required

@@ -271,6 +271,7 @@ export async function closeTicket(channel, closer, reason = 'No reason provided'
           const banDuration = 5 * 24 * 60 * 60 * 1000; // 5 days
           const banUntil = Date.now() + banDuration;
           await setInDb(`guild:${channel.guild.id}:p2p:ban_until:${ticketData.userId}`, banUntil);
+          await setInDb(timepassKey, 0); // Reset timepass count after ban is applied
           isBannedNow = true;
           banExpiresStr = `<t:${Math.floor(banUntil / 1000)}:F> (<t:${Math.floor(banUntil / 1000)}:R>)`;
         }

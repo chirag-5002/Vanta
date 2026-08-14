@@ -1,6 +1,6 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, MessageFlags, ChannelType } from 'discord.js';
 import { createTicket } from '../../../services/ticket.js';
-import { getFromDb, setInDb } from '../../../utils/database.js';
+import { getFromDb, setInDb, getP2PUserStatsKey } from '../../../utils/database.js';
 import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed } from '../../../services/p2pService.js';
 import { logger } from '../../../utils/logger.js';
 import { errorEmbed } from '../../../utils/embeds.js';
@@ -45,10 +45,16 @@ export const p2pAmountModalHandler = {
         const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${interaction.user.id}:${today}`;
         const dailyCount = await getFromDb(dailyTicketsKey, 0);
         if (dailyCount >= 3) {
-            return await replyUserError(interaction, {
-                type: ErrorTypes.VALIDATION,
-                message: `❌ **Limit Exceeded:** You can create a maximum of **3 P2P tickets** (Buy/Sell combined) per day.\n\nYou have already created ${dailyCount} tickets today. Please try again tomorrow.`
-            });
+            const userStatsKey = getP2PUserStatsKey(interaction.guildId, interaction.user.id);
+            const stats = await getFromDb(userStatsKey, { completedDeals: 0 });
+            const completedDeals = stats?.completedDeals || 0;
+
+            if (completedDeals === 0) {
+                return await replyUserError(interaction, {
+                    type: ErrorTypes.VALIDATION,
+                    message: `❌ **Limit Exceeded:** You can create a maximum of **3 P2P tickets** (Buy/Sell combined) per day.\n\nYou have already created ${dailyCount} tickets today. Please try again tomorrow.`
+                });
+            }
         }
 
         const amountRaw = safeGetField(interaction.fields, 'q1_amount') || '';
