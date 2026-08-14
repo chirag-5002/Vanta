@@ -52,6 +52,10 @@ export default {
                     option.setName('milestone')
                         .setDescription('The milestone member count (e.g. 500)')
                         .setRequired(true))
+                .addUserOption(option =>
+                    option.setName('member')
+                        .setDescription('The member to thank/celebrate (optional, defaults to auto-detection)')
+                        .setRequired(false))
         )
         .addSubcommand(subcommand =>
             subcommand
@@ -163,7 +167,25 @@ export default {
                 const memberCount = guild.memberCount;
                 const nextMilestone = getNextMilestone(milestoneValue);
 
-                const success = await announceMilestoneCelebration(guild, client, milestoneValue, memberCount, interaction.member, nextMilestone);
+                const targetUser = options.getUser('member');
+                let targetMember = null;
+
+                if (targetUser) {
+                    targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
+                } else {
+                    try {
+                        const members = await guild.members.fetch();
+                        const sortedMembers = Array.from(members.values()).sort(
+                            (a, b) => (a.joinedTimestamp || 0) - (b.joinedTimestamp || 0)
+                        );
+                        // milestoneValue is 1-indexed, so we subtract 1 to get the 0-indexed position
+                        targetMember = sortedMembers[milestoneValue - 1] || null;
+                    } catch (err) {
+                        logger.error('Error auto-detecting milestone member:', err);
+                    }
+                }
+
+                const success = await announceMilestoneCelebration(guild, client, milestoneValue, memberCount, targetMember, nextMilestone);
 
                 if (success) {
                     // Update reached database to prevent duplicate automatic announcement later
@@ -174,9 +196,9 @@ export default {
                     if (!reachedNumbers.includes(milestoneValue)) {
                         reachedMilestones.push({
                           milestone: milestoneValue,
-                          userId: interaction.user.id,
-                          userTag: interaction.user.tag,
-                          userAvatar: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
+                          userId: targetMember ? targetMember.user.id : 'N/A',
+                          userTag: targetMember ? targetMember.user.tag : 'System/Imported',
+                          userAvatar: targetMember ? targetMember.user.displayAvatarURL({ extension: 'png', size: 128 }) : null,
                           reachedAt: new Date().toISOString()
                         });
                         await client.db.set(reachedKey, reachedMilestones);

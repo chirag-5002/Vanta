@@ -205,15 +205,16 @@ export async function announceMilestoneCelebration(guild, client, milestone, mem
     const suffix = getOrdinalSuffix(milestone);
     const celebrationEmbed = new EmbedBuilder()
       .setColor(getColor('success', '#F1C40F')) // Gold / Success color
-      .setTitle('🎉 SERVER MILESTONE ACHIEVED! 🎉')
+      .setTitle('🌟 SERVER MILESTONE ACHIEVED! 🌟')
       .setDescription(
-        `### We have officially reached **${milestone.toLocaleString()}** members!\n\n` +
-        `A huge thank you to our **${milestone.toLocaleString()}${suffix}** member, ${member ? member.toString() : 'someone special'}! ` +
-        `We are incredibly grateful for each and every one of you. Our community is growing stronger every single day! 🚀\n\n` +
-        `🏆 **Next Milestone Goal:** \`${nextMilestone.toLocaleString()}\` members! Can we make it?`
+        `## We have officially reached **${milestone.toLocaleString()}** members! 🚀\n\n` +
+        `A huge thank you to our **${milestone.toLocaleString()}${suffix}** member, ${member ? member.toString() : 'someone special'}! 💖\n\n` +
+        `We are incredibly grateful for each and every one of you who makes this server such a wonderful place. Our community is growing stronger, more active, and more amazing every single day! Let's keep this momentum going! ✨\n\n` +
+        `🏆 **Next Target:** \`${nextMilestone.toLocaleString()}\` members! Can we hit it? Let's go! 🔥`
       )
       .setImage(`attachment://milestone-${milestone}.png`)
-      .setTimestamp();
+      .setTimestamp()
+      .setFooter({ text: `${guild.name} • Journey to ${nextMilestone.toLocaleString()}`, iconURL: guildIconUrl });
 
     const celebrationMsg = await channel.send({ embeds: [celebrationEmbed], files: [attachment] });
     
