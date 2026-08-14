@@ -487,11 +487,9 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
     }, botId);
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, channel.guild);
-    const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
     const sentMsg = await targetChannel.send({
-        embeds: [dealEmbed],
-        components: [componentsRow]
+        embeds: [dealEmbed]
     });
 
     dealRecord.messageId = sentMsg.id;

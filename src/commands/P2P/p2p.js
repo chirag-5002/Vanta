@@ -639,12 +639,10 @@ async function handleAutoLog(interaction) {
     }
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
-    const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
     if (targetChannel && targetChannel.id !== interaction.channel?.id) {
         const sentMsg = await targetChannel.send({
-            embeds: [dealEmbed],
-            components: [componentsRow]
+            embeds: [dealEmbed]
         });
         dealRecord.messageId = sentMsg.id;
         dealRecord.channelId = targetChannel.id;
@@ -784,14 +782,12 @@ async function handleDeal(interaction) {
     }
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
-    const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
 
     if (targetChannel.id !== interaction.channel?.id) {
         let sentMsg;
         try {
             sentMsg = await targetChannel.send({
-                embeds: [dealEmbed],
-                components: [componentsRow]
+                embeds: [dealEmbed]
             });
             dealRecord.messageId = sentMsg.id;
             dealRecord.channelId = targetChannel.id;
