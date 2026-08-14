@@ -159,7 +159,7 @@ export async function createReportTicket(guild, reporter, targetUser, irritateCh
                 `Our Moderation team will review the details below shortly. You may upload screenshots/evidence in this channel if needed.\n\n` +
                 `**Report Details:**\n` +
                 `• **Reported User:** ${typeof targetUser === 'object' ? `<@${targetUser.id}> (${targetUser.tag})` : `\`${targetUser}\``}\n` +
-                `• **Disturbed/Irritated you?** \`${irritateCheck}\`\n` +
+                `• **Did the incident happen to you?** \`${irritateCheck}\`\n` +
                 `• **Details:** ${details}`
             )
             .setColor('#E74C3C')
@@ -188,7 +188,7 @@ export async function createReportTicket(guild, reporter, targetUser, irritateCh
                     .setDescription(
                         `**Reporter:** <@${reporter.id}> (\`${reporter.id}\`)\n` +
                         `**Reported User:** ${typeof targetUser === 'object' ? `<@${targetUser.id}> (\`${targetUser.id}\` - ${targetUser.tag})` : `\`${targetUser}\``}\n` +
-                        `**Disturbed/Irritated:** \`${irritateCheck}\`\n` +
+                        `**Did the incident happen to you?** \`${irritateCheck}\`\n` +
                         `**Ticket Channel:** <#${ticketChannel.id}>\n\n` +
                         `**Incident Details:**\n${details}`
                     )

@@ -12,7 +12,7 @@ export default {
 
         const irritateCheckInput = new TextInputBuilder()
             .setCustomId('irritate_check')
-            .setLabel('Did they disturb or irritate you? (Yes/No)')
+            .setLabel('Did the incident happen to you? (Yes/No)')
             .setStyle(TextInputStyle.Short)
             .setPlaceholder('Yes / No')
             .setMaxLength(20)
