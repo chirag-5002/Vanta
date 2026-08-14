@@ -101,9 +101,10 @@ export default {
             }
         }
         
-        if (config?.verification?.enabled || config?.verification?.autoVerify?.enabled) {
-            await handleVerification(member, guild, config.verification, member.client);
-        }
+        // Auto-verify is disabled completely. All users must verify manually in the verification channel.
+        // if (config?.verification?.enabled || config?.verification?.autoVerify?.enabled) {
+        //     await handleVerification(member, guild, config.verification, member.client);
+        // }
 
         try {
             await logEvent({
