@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents } from '../../services/p2pService.js';
-import { getTicketData, saveTicketData } from '../../utils/database.js';
+import { getTicketData, saveTicketData, deleteFromDb } from '../../utils/database.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -258,6 +258,17 @@ export default {
                         .setDescription('Number of past deals to show (max 10, default 5)')
                         .setRequired(false)
                 )
+        )
+        // Subcommand: Reset User P2P Limits
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('reset')
+                .setDescription("Resets a user's P2P limits (daily ticket count, ban, and timepass count).")
+                .addUserOption(option =>
+                    option.setName('user')
+                        .setDescription('The user to reset P2P limits for')
+                        .setRequired(true)
+                )
         ),
 
     async execute(interaction, guildConfig, client) {
@@ -306,6 +317,10 @@ export default {
 
         if (subcommand === 'history') {
             return await handleHistory(interaction);
+        }
+
+        if (subcommand === 'reset') {
+            return await handleReset(interaction);
         }
     }
 };
@@ -894,6 +909,49 @@ async function handleHistory(interaction) {
             infoEmbed(
                 targetUser ? `P2P Deal History for ${targetUser.username}` : 'Recent Server P2P Deals',
                 lines.join('\n\n')
+            )
+        ]
+    });
+}
+
+/**
+ * Resets P2P limits and active bans for a specific user.
+ */
+async function handleReset(interaction) {
+    const config = await getP2PConfig(interaction.guildId);
+
+    // Permission check: Only staff or admins can reset P2P limits
+    const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || false;
+    const hasStaffRole = config.staffRoleId && interaction.member
+        ? (interaction.member.roles?.cache?.has ? interaction.member.roles.cache.has(config.staffRoleId) : Array.isArray(interaction.member.roles) && interaction.member.roles.includes(config.staffRoleId))
+        : false;
+
+    if (!hasManageGuild && !hasStaffRole) {
+        const requiredMsg = config.staffRoleId
+            ? `You need the <@&${config.staffRoleId}> role or \`Manage Server\` permission to reset P2P limits.`
+            : 'You need the `Manage Server` permission to reset P2P limits.';
+        return await replyUserError(interaction, { type: ErrorTypes.PERMISSION, message: requiredMsg });
+    }
+
+    const targetUser = interaction.options.getUser('user');
+    const today = new Date().toISOString().split('T')[0];
+
+    const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${targetUser.id}:${today}`;
+    const timepassKey = `guild:${interaction.guildId}:p2p:timepass_count:${targetUser.id}`;
+    const banKey = `guild:${interaction.guildId}:p2p:ban_until:${targetUser.id}`;
+
+    await deleteFromDb(dailyTicketsKey).catch(() => null);
+    await deleteFromDb(timepassKey).catch(() => null);
+    await deleteFromDb(banKey).catch(() => null);
+
+    return await InteractionHelper.safeEditReply(interaction, {
+        embeds: [
+            successEmbed(
+                'P2P Limits Reset',
+                `Successfully cleared P2P limits and restrictions for ${targetUser}.\n\n` +
+                `• **Daily Tickets Count:** Reset to \`0\`\n` +
+                `• **Timepass Count:** Reset to \`0\`\n` +
+                `• **P2P Ban Status:** Lifted (if active)`
             )
         ]
     });
