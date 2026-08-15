@@ -10,7 +10,7 @@ export const getMilestoneChannelKey = (guildId) => `guild:${guildId}:milestone:c
 export const getReachedMilestonesKey = (guildId) => `guild:${guildId}:milestone:reached`;
 
 export function getMilestonesUpTo(count) {
-  const milestones = [200, 500, 1000, 1500, 2000, 3000, 4000];
+  const milestones = [500, 1000, 1500, 2000, 3000, 4000];
 
   // From 4,000 onwards: steps of 1,000
   if (count > 4000) {
@@ -34,7 +34,6 @@ export function getNextMilestone(currentMilestone) {
     return list[currentIndex + 1];
   }
   // Fallbacks if not found in list
-  if (currentMilestone < 200) return 200;
   if (currentMilestone < 500) return 500;
   if (currentMilestone < 1000) return 1000;
   if (currentMilestone < 2000) return currentMilestone + 500;
@@ -80,7 +79,25 @@ export async function checkAndAnnounceMilestone(member) {
   try {
     const memberCount = guild.memberCount;
     const reachedKey = getReachedMilestonesKey(guild.id);
-    const reachedMilestones = unwrapReplitData(await client.db.get(reachedKey)) || [];
+    let reachedMilestones = unwrapReplitData(await client.db.get(reachedKey));
+
+    // 1. Database Pre-initialization:
+    // If the database has never tracked milestones for this guild, mark all current eligible milestones
+    // as completed so we don't trigger them late.
+    if (reachedMilestones === null || reachedMilestones === undefined) {
+      const eligibleMilestones = getMilestonesUpTo(memberCount);
+      reachedMilestones = eligibleMilestones.map(m => ({
+        milestone: m,
+        userId: 'N/A',
+        userTag: 'System/Initialization',
+        userAvatar: null,
+        reachedAt: new Date().toISOString()
+      }));
+      await client.db.set(reachedKey, reachedMilestones);
+      logger.info(`Initialized milestone tracking for guild ${guild.name} (${guild.id}). Marked ${eligibleMilestones.length} milestones as completed.`);
+      return;
+    }
+
     const reachedNumbers = reachedMilestones.map(m => typeof m === 'object' ? m.milestone : m);
 
     // Find all milestones <= current count
@@ -97,25 +114,24 @@ export async function checkAndAnnounceMilestone(member) {
     const newMilestone = Math.max(...unannounced);
     const nextMilestone = getNextMilestone(newMilestone);
 
-    // Assign the "Milestone Legend" role to the triggering member
-    await assignMilestoneLegendRole(guild, member);
+    // 2. Strict Range Check:
+    // Only send the celebration announcement message if the current member count is very close to the milestone
+    // (e.g. within milestone and milestone + 2). This prevents late triggers or wrong tagging.
+    const isWithinRange = (memberCount >= newMilestone && memberCount <= newMilestone + 2);
 
-    // Prepare full metadata object for the new milestone
+    // Prepare metadata object
     const newRecord = {
       milestone: newMilestone,
-      userId: member.user.id,
-      userTag: member.user.tag,
-      userAvatar: member.user.displayAvatarURL({ extension: 'png', size: 128 }),
+      userId: isWithinRange ? member.user.id : 'N/A',
+      userTag: isWithinRange ? member.user.tag : 'System/Skipped',
+      userAvatar: isWithinRange ? member.user.displayAvatarURL({ extension: 'png', size: 128 }) : null,
       reachedAt: new Date().toISOString()
     };
 
     // Update DB: mark this milestone and all smaller ones as reached
     const updatedReached = [...reachedMilestones];
-    
-    // Add the new milestone object
     updatedReached.push(newRecord);
     
-    // Mark any smaller/skipped milestones as resolved (with N/A metadata)
     for (const m of eligibleMilestones) {
       if (m < newMilestone && !reachedNumbers.includes(m)) {
         updatedReached.push({
@@ -130,8 +146,15 @@ export async function checkAndAnnounceMilestone(member) {
 
     await client.db.set(reachedKey, updatedReached);
 
-    // Announce the milestone celebration with the glowing canvas image!
-    await announceMilestoneCelebration(guild, client, newMilestone, memberCount, member, nextMilestone);
+    if (isWithinRange) {
+      // Assign the "Milestone Legend" role to the triggering member
+      await assignMilestoneLegendRole(guild, member);
+
+      // Announce the milestone celebration with the glowing canvas image!
+      await announceMilestoneCelebration(guild, client, newMilestone, memberCount, member, nextMilestone);
+    } else {
+      logger.info(`Milestone ${newMilestone} marked completed silently for guild ${guild.name} (Count: ${memberCount} is out of trigger range).`);
+    }
 
   } catch (error) {
     logger.error('Error in checkAndAnnounceMilestone:', error);
