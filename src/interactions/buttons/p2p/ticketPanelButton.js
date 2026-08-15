@@ -2,6 +2,7 @@ import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, Strin
 import { wizardSelections } from '../../selectMenus/p2p/p2pWizardSelect.js';
 import { getFromDb, getP2PUserStatsKey } from '../../../utils/database.js';
 import { logger } from '../../../utils/logger.js';
+import { getP2PConfig } from '../../../services/p2pService.js';
 
 // ==================== STEP 1: Show Amount Modal ====================
 
@@ -75,14 +76,17 @@ export const p2pTradeButtonHandler = {
         const key = `${interaction.guildId}:${interaction.user.id}`;
         wizardSelections.delete(key);
 
+        const config = await getP2PConfig(interaction.guildId);
+        const minLimit = config?.minTradeAmount !== undefined ? config.minTradeAmount : 50;
+
         const modal = new ModalBuilder()
             .setCustomId(`p2p_amount_modal:${tradeType}:${kycType}`)
             .setTitle(`${isBuy ? '🛒 Buy USDT' : '🔴 Sell USDT'} — Step 1`);
 
         const amountInput = new TextInputBuilder()
             .setCustomId('q1_amount')
-            .setLabel(`How much USDT to ${isBuy ? 'BUY' : 'SELL'}? (Min. 100)`)
-            .setPlaceholder('Minimum 100 USDT (e.g. 150, 500)')
+            .setLabel(`How much USDT to ${isBuy ? 'BUY' : 'SELL'}? (Min. ${minLimit})`)
+            .setPlaceholder(`Minimum ${minLimit} USDT (e.g. ${minLimit + 50}, ${minLimit + 450})`)
             .setStyle(TextInputStyle.Short)
             .setRequired(true);
 

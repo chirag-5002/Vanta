@@ -10,6 +10,7 @@ export const DEFAULT_P2P_CONFIG = {
     titleText: 'Successful Transaction',
     footerText: 'ICN Verified Successful Deal',
     embedColor: '#FFC107', // Amber/Yellow matching reference design
+    minTradeAmount: 50,
 };
 
 export const DEFAULT_PAYMENT_CONFIG = {
@@ -404,11 +405,14 @@ export async function autoDetectDealFromChannel(channel, guildId) {
     buyerId = isSell ? botId : userCreatorId;
     sellerId = isSell ? userCreatorId : botId;
 
+    const config = await getP2PConfig(channel.guild?.id).catch(() => null);
+    const minLimit = config?.minTradeAmount !== undefined ? config.minTradeAmount : 50;
+
     return {
         buyerId,
         sellerId,
-        usdtAmount: usdtAmount || 100,
-        usdAmount: usdtAmount || 100,
+        usdtAmount: usdtAmount || minLimit,
+        usdAmount: usdtAmount || minLimit,
         txHash: txHash || null,
         dealInfo: dealInfo || (isSell ? 'Sell USDT Deal' : 'Buy USDT Deal')
     };

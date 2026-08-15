@@ -238,6 +238,12 @@ export default {
                         .setDescription('Custom embed footer text (e.g., "ICN Verified Successful Deal")')
                         .setRequired(false)
                 )
+                .addIntegerOption(option =>
+                    option.setName('min_qty')
+                        .setDescription('Minimum USDT buy/sell quantity limit (Default: 50)')
+                        .setRequired(false)
+                        .setMinValue(1)
+                )
         )
 
         // Subcommand: View trade stats
@@ -712,18 +718,21 @@ async function handleSetup(interaction) {
     const vouchChannel = interaction.options.getChannel('vouch_channel');
     const staffRole = interaction.options.getRole('staff_role');
     const footerText = interaction.options.getString('footer');
+    const minQty = interaction.options.getInteger('min_qty');
 
     const updateObj = {};
     if (dealChannel) updateObj.dealChannelId = dealChannel.id;
     if (vouchChannel) updateObj.vouchChannelId = vouchChannel.id;
     if (staffRole) updateObj.staffRoleId = staffRole.id;
     if (footerText) updateObj.footerText = footerText;
+    if (minQty !== null) updateObj.minTradeAmount = minQty;
 
     if (Object.keys(updateObj).length === 0) {
         const currentConfig = await getP2PConfig(interaction.guildId);
         const dealChanStr = currentConfig.dealChannelId ? `<#${currentConfig.dealChannelId}>` : 'Not Set';
         const vouchChanStr = currentConfig.vouchChannelId ? `<#${currentConfig.vouchChannelId}>` : 'Not Set';
         const staffRoleStr = currentConfig.staffRoleId ? `<@&${currentConfig.staffRoleId}>` : 'None (Admins Only)';
+        const minTradeLimit = currentConfig.minTradeAmount !== undefined ? currentConfig.minTradeAmount : 50;
 
         return await InteractionHelper.safeEditReply(interaction, {
             embeds: [
@@ -733,6 +742,7 @@ async function handleSetup(interaction) {
                     `• **Deal Log Channel:** ${dealChanStr}\n` +
                     `• **Vouch Channel:** ${vouchChanStr}\n` +
                     `• **Staff / Middleman Role:** ${staffRoleStr}\n` +
+                    `• **Minimum Quantity Limit:** \`${minTradeLimit} USDT\`\n` +
                     `• **Footer Label:** \`${currentConfig.footerText}\`_\n\n` +
                     `Use options in \`/p2p setup\` to update these settings.`
                 )
@@ -747,6 +757,7 @@ async function handleSetup(interaction) {
     if (vouchChannel) changes.push(`• **Vouch Channel:** <#${vouchChannel.id}>`);
     if (staffRole) changes.push(`• **Staff Role:** <@&${staffRole.id}>`);
     if (footerText) changes.push(`• **Footer Label:** \`${footerText}\``);
+    if (minQty !== null) changes.push(`• **Minimum Quantity Limit:** \`${minQty} USDT\``);
 
     return await InteractionHelper.safeEditReply(interaction, {
         embeds: [

@@ -68,10 +68,13 @@ export const p2pAmountModalHandler = {
             });
         }
 
-        if (amountVal < 100) {
+        const config = await getP2PConfig(interaction.guildId);
+        const minLimit = config?.minTradeAmount !== undefined ? config.minTradeAmount : 50;
+
+        if (amountVal < minLimit) {
             return await replyUserError(interaction, {
                 type: ErrorTypes.VALIDATION,
-                message: '❌ The minimum trading amount is **100 USDT**. Please enter a value of 100 or greater.'
+                message: `❌ The minimum trading amount is **${minLimit} USDT**. Please enter a value of ${minLimit} or greater.`
             });
         }
 
@@ -128,7 +131,10 @@ export const p2pDetailsModalHandler = {
             const key = `${interaction.guildId}:${interaction.user.id}`;
             const selections = wizardSelections.get(key) || {};
 
-            const amountDisplay = selections.amount || '100';
+            const config = await getP2PConfig(interaction.guildId);
+            const minLimit = config?.minTradeAmount !== undefined ? config.minTradeAmount : 50;
+
+            const amountDisplay = selections.amount || minLimit.toString();
             const paymentMethod = (selections.paymentMethod || 'UPI').toUpperCase();
             const networkRaw = selections.network || 'USDT_TRC20';
             const networkLabel = networkRaw.replace(/_/g, ' ').toUpperCase();
@@ -142,8 +148,6 @@ export const p2pDetailsModalHandler = {
 
             // Clean up wizard selections
             wizardSelections.delete(key);
-
-            const config = await getP2PConfig(interaction.guildId);
             const paymentConfig = await getP2PPaymentConfig(interaction.guildId);
 
             const reason = `${isBuy ? 'Buy' : 'Sell'} ${amountDisplay} USDT via ${paymentMethod} (${networkLabel})`;
