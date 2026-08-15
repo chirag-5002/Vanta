@@ -231,6 +231,12 @@ async function handleReceiptUpload(message, client) {
     const { getTicketData } = await import('../utils/database.js');
     const ticketData = await getTicketData(message.guild.id, message.channel.id).catch(() => null);
 
+    // Strictly ensure this is a P2P trade ticket (Buy/Sell USDT)
+    const isP2P = ticketData && 
+                  (ticketData.reason?.includes('USDT') && 
+                   (ticketData.reason?.startsWith('Buy') || ticketData.reason?.startsWith('Sell')));
+    if (!isP2P) return;
+
     // Hybrid check: DB record OR check if they have a specific user permission overwrite (excluding the bot itself)
     const isCreator = (ticketData && ticketData.userId === message.author.id) ||
                       (message.channel.permissionOverwrites.cache.has(message.author.id) &&
@@ -266,6 +272,15 @@ async function handleAutoP2PKeyword(message) {
   try {
     const channelName = message.channel?.name?.toLowerCase() || '';
     if (!channelName.includes('ticket') && !channelName.includes('p2p')) return;
+
+    // Get ticket data to check if this is a P2P ticket
+    const { getTicketData } = await import('../utils/database.js');
+    const ticketData = await getTicketData(message.guild.id, message.channel.id).catch(() => null);
+
+    const isP2P = ticketData && 
+                  (ticketData.reason?.includes('USDT') && 
+                   (ticketData.reason?.startsWith('Buy') || ticketData.reason?.startsWith('Sell')));
+    if (!isP2P) return;
 
     const content = message.content || '';
     const isTxHash = /(0x[a-fA-F0-9]{40,66})|(https?:\/\/(bscscan|etherscan|tronscan|solscan)[^\s]+)/i.test(content);
