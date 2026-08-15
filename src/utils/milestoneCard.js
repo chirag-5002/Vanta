@@ -64,23 +64,38 @@ export async function generateMilestoneCard(avatarUrl, username, guildName, guil
     ctx.fill();
     ctx.restore();
 
-    // 3. Draw new milestone number (e.g., 500, 1000) in the exact same spot
+    // 3. Draw new milestone number (e.g., 500, 1000) in the exact same spot (X=412, Y=330)
     ctx.save();
     ctx.textAlign = 'center';
-    ctx.font = `bold 125px ${fontBold}`;
+    ctx.textBaseline = 'middle';
     
-    // Premium gold gradient matching the template's gold numbers
-    const textGrad = ctx.createLinearGradient(412, 268, 412, 395);
-    textGrad.addColorStop(0, '#FFE082'); // Bright gold top
-    textGrad.addColorStop(0.5, '#F5B041'); // Medium gold
-    textGrad.addColorStop(1, '#9C640C'); // Dark bronze bottom
+    // Use Georgia for beautiful serif digits matching the template
+    ctx.font = 'bold 125px Georgia'; 
+    
+    // Create multi-stop diagonal metallic gold gradient matching the template's gold numbers
+    const textGrad = ctx.createLinearGradient(412 - 90, 330 - 55, 412 + 90, 330 + 55);
+    textGrad.addColorStop(0, '#FFE082');   // Bright gold top-left
+    textGrad.addColorStop(0.2, '#FFE57F');
+    textGrad.addColorStop(0.4, '#F5B041'); // Deep warm gold
+    textGrad.addColorStop(0.65, '#FFE57F'); // Shiny highlight
+    textGrad.addColorStop(0.85, '#D59F0F'); // Darker gold
+    textGrad.addColorStop(1, '#8C5A03');   // Dark bronze bottom-right
+    
+    // 3D Drop Shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetX = 4;
+    ctx.shadowOffsetY = 6;
     
     ctx.fillStyle = textGrad;
-    ctx.shadowColor = '#F5B041';
-    ctx.shadowBlur = 20;
+    ctx.fillText(`${milestone}`, 412, 330);
     
-    // Draw centered milestone number
-    ctx.fillText(`${milestone}`, 412, 382);
+    // 4. Draw golden outline/stroke for metallic bevel effect
+    ctx.shadowColor = 'transparent'; // Remove shadow for outline
+    ctx.strokeStyle = '#FFE082'; // Gold border
+    ctx.lineWidth = 1.5;
+    ctx.strokeText(`${milestone}`, 412, 330);
+    
     ctx.restore();
 
     const buffer = canvas.toBuffer('image/png');
