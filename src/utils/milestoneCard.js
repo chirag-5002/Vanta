@@ -37,19 +37,30 @@ export async function generateMilestoneCard(avatarUrl, username, guildName, guil
     // 1. Draw the exact original template image
     ctx.drawImage(bgImg, 0, 0, width, height);
 
-    // 2. Cover up ONLY the number "200" from the template
-    // The "200" sits exactly between X = 290 and X = 535, Y = 260 and Y = 405.
+    // 2. Cover up ONLY the number "200" from the template using a clipped ellipse
+    // Bounded vertically to Y = 395 to prevent clipping into the golden ribbon "MEMBERS" (starts at Y=400)
     ctx.save();
-    ctx.fillStyle = '#060709';
-    ctx.fillRect(290, 260, 245, 145);
+    ctx.beginPath();
+    ctx.ellipse(412, 330, 130, 65, 0, 0, Math.PI * 2);
+    ctx.clip();
 
-    // Reconstruct soft gold backing glow in the center of the covered area
-    const glow = ctx.createRadialGradient(412, 333, 10, 412, 333, 120);
-    glow.addColorStop(0, 'rgba(245, 176, 65, 0.15)'); // Soft warm gold
+    // Fill with a smooth radial gradient that matches the background color and fades out at the edges
+    const grad = ctx.createRadialGradient(412, 330, 10, 412, 330, 130);
+    grad.addColorStop(0, '#060709');
+    grad.addColorStop(0.8, '#060709');
+    grad.addColorStop(1, 'rgba(6, 7, 9, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(250, 250, 320, 160);
+    ctx.restore();
+
+    // Reconstruct gold backing glow in the center of the covered area
+    ctx.save();
+    const glow = ctx.createRadialGradient(412, 330, 10, 412, 330, 100);
+    glow.addColorStop(0, 'rgba(245, 176, 65, 0.12)'); // Soft gold glow
     glow.addColorStop(1, 'rgba(6, 7, 9, 0)');
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(412, 333, 120, 0, Math.PI * 2);
+    ctx.arc(412, 330, 100, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
@@ -59,7 +70,7 @@ export async function generateMilestoneCard(avatarUrl, username, guildName, guil
     ctx.font = `bold 125px ${fontBold}`;
     
     // Premium gold gradient matching the template's gold numbers
-    const textGrad = ctx.createLinearGradient(412, 268, 412, 399);
+    const textGrad = ctx.createLinearGradient(412, 268, 412, 395);
     textGrad.addColorStop(0, '#FFE082'); // Bright gold top
     textGrad.addColorStop(0.5, '#F5B041'); // Medium gold
     textGrad.addColorStop(1, '#9C640C'); // Dark bronze bottom
@@ -69,7 +80,7 @@ export async function generateMilestoneCard(avatarUrl, username, guildName, guil
     ctx.shadowBlur = 20;
     
     // Draw centered milestone number
-    ctx.fillText(`${milestone}`, 412, 385);
+    ctx.fillText(`${milestone}`, 412, 382);
     ctx.restore();
 
     const buffer = canvas.toBuffer('image/png');
