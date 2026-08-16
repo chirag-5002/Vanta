@@ -218,8 +218,27 @@ export const p2pDetailsModalHandler = {
 
             if (isBuy) {
                 const totalInr = amountVal * buyPrice;
-                const receiveUsdt = isKyc ? (amountVal * 0.999) : (amountVal * 0.99);
-                const feePercentage = isKyc ? '0.1%' : '1%';
+                let fee = 0;
+                let feePercentage = '';
+                if (isKyc) {
+                    fee = amountVal * 0.005;
+                    feePercentage = '0.5%';
+                } else {
+                    if (amountVal <= 100) {
+                        fee = 2;
+                        feePercentage = '$2';
+                    } else if (amountVal <= 500) {
+                        fee = 3;
+                        feePercentage = '$3';
+                    } else if (amountVal <= 1200) {
+                        fee = 5;
+                        feePercentage = '$5';
+                    } else {
+                        fee = amountVal * 0.005;
+                        feePercentage = '0.5%';
+                    }
+                }
+                const receiveUsdt = amountVal - fee;
 
                 cardDescription = [
                     `Welcome <@${interaction.user.id}>! A verified Middleman / Support staff will assist your trade shortly.\n`,
@@ -236,12 +255,14 @@ export const p2pDetailsModalHandler = {
                     `> **Security:** \`Auto-MM Protected Trade\``
                 ].join('\n');
             } else {
-                const netUsdtForPayout = isKyc ? amountVal : (amountVal * 0.99);
+                const netUsdtForPayout = amountVal;
                 let totalInrPayout = netUsdtForPayout * sellPrice;
                 if (isKyc) {
                     totalInrPayout = totalInrPayout - 100;
+                } else {
+                    totalInrPayout = totalInrPayout - 250;
                 }
-                const feeDetails = isKyc ? 'Flat ₹100 network fee' : '1% non-KYC fee';
+                const feeDetails = isKyc ? 'Flat ₹100 network fee' : 'Flat ₹250 non-KYC fee';
 
                 cardDescription = [
                     `Welcome <@${interaction.user.id}>! A verified Middleman / Support staff will assist your trade shortly.\n`,
@@ -284,14 +305,30 @@ export const p2pDetailsModalHandler = {
             // 4. Auto-dispatch Payment QR Code / Bank Details or Deposit Wallet
             if (isBuy) {
                 const totalInr = amountVal * buyPrice;
-                const receiveUsdt = isKyc ? (amountVal * 0.999) : (amountVal * 0.99);
+                let fee = 0;
+                if (isKyc) {
+                    fee = amountVal * 0.005;
+                } else {
+                    if (amountVal <= 100) {
+                        fee = 2;
+                    } else if (amountVal <= 500) {
+                        fee = 3;
+                    } else if (amountVal <= 1200) {
+                        fee = 5;
+                    } else {
+                        fee = amountVal * 0.005;
+                    }
+                }
+                const receiveUsdt = amountVal - fee;
                 const paymentEmbed = buildBuyPaymentEmbed(paymentMethod, paymentConfig, totalInr, receiveUsdt);
                 await ticketChannel.send({ embeds: [paymentEmbed] });
             } else {
-                const netUsdtForPayout = isKyc ? amountVal : (amountVal * 0.99);
+                const netUsdtForPayout = amountVal;
                 let totalInrPayout = netUsdtForPayout * sellPrice;
                 if (isKyc) {
                     totalInrPayout = totalInrPayout - 100;
+                } else {
+                    totalInrPayout = totalInrPayout - 250;
                 }
                 const depositEmbed = buildSellPaymentEmbed(networkLabel, paymentConfig, amountVal, totalInrPayout);
                 await ticketChannel.send({ embeds: [depositEmbed] });

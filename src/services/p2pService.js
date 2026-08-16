@@ -201,7 +201,7 @@ export async function autoDeployP2PPanels(guild) {
 
         if (buyChannel) {
             const msgs = await buyChannel.messages.fetch({ limit: 10 }).catch(() => null);
-            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_buy_kyc')) && m.embeds.some(e => e.description?.includes('0.1% fee')));
+            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_buy_kyc')) && m.embeds.some(e => e.description?.includes('0.5% fee') && e.description?.includes('Tiered fees')));
             
             if (!botHasNewPanel) {
                 if (msgs) {
@@ -216,8 +216,12 @@ export async function autoDeployP2PPanels(guild) {
                     .setDescription(
                         `Welcome to **${guild.name}** USDT Buying Portal!\n\n` +
                         `Select an option below to open an instant 1-on-1 Middleman Buy Ticket:\n\n` +
-                        `• **🟢 Buy with KYC:** Only **0.1% fee** (You receive **99.9%** of requested USDT).\n` +
-                        `• **🟢 Buy without KYC:** Standard **1% fee** (You receive **99%** of requested USDT).\n\n` +
+                        `• **🟢 Buy with KYC:** Only **0.5% fee** (You receive **99.5%** of requested USDT).\n` +
+                        `• **🟢 Buy without KYC:** Tiered fees apply:\n` +
+                        `  - **$50 - $100:** **$2** flat fee\n` +
+                        `  - **$101 - $500:** **$3** flat fee\n` +
+                        `  - **$501 - $1200:** **$5** flat fee\n` +
+                        `  - **$1200 - $10000:** **0.5%** fee of amount\n\n` +
                         `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
                     )
                     .setColor('#2ECC71')
@@ -240,7 +244,7 @@ export async function autoDeployP2PPanels(guild) {
 
         if (sellChannel) {
             const msgs = await sellChannel.messages.fetch({ limit: 10 }).catch(() => null);
-            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_sell_kyc')) && m.embeds.some(e => e.description?.includes('₹100 network fee')));
+            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_sell_kyc')) && m.embeds.some(e => e.description?.includes('₹250') && e.description?.includes('₹100')));
 
             if (!botHasNewPanel) {
                 if (msgs) {
@@ -255,8 +259,8 @@ export async function autoDeployP2PPanels(guild) {
                     .setDescription(
                         `Welcome to **${guild.name}** USDT Selling Portal!\n\n` +
                         `Select an option below to open an instant 1-on-1 Middleman Sell Ticket:\n\n` +
-                        `• **🔴 Sell with KYC:** Full rate payout (Flat ₹100 network fee deducted).\n` +
-                        `• **🔴 Sell without KYC:** **1% fee** deducted on your USDT before payout calculation.\n\n` +
+                        `• **🔴 Sell with KYC:** Full rate payout (Flat **₹100** network fee deducted from payout).\n` +
+                        `• **🔴 Sell without KYC:** Full rate payout (Flat **₹250** fee deducted from payout).\n\n` +
                         `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
                     )
                     .setColor('#E74C3C')
