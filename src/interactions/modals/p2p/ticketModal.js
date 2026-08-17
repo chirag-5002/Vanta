@@ -258,8 +258,7 @@ export const p2pDetailsModalHandler = {
                     `> **6. Payment Method:** \`${paymentMethod}\``,
                     `> **7. Crypto Network:** \`${networkLabel}\``,
                     `> **8. Your Receiving Wallet Address:** \`${addressDisplay}\``,
-                    `> **Security:** \`Auto-MM Protected Trade\`\n`,
-                    `💡 **Action Required:** <@${interaction.user.id}>, please upload a **screenshot** of your receiving wallet address (showing the address & QR code) from your wallet app (e.g. Trust Wallet, MetaMask) to verify and prevent typos.`
+                    `> **Security:** \`Auto-MM Protected Trade\``
                 ].join('\n');
             } else {
                 const netUsdtForPayout = amountVal;
