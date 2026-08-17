@@ -171,6 +171,12 @@ export const p2pDetailsModalHandler = {
             );
 
             const ticketChannel = result.channel;
+            const ticketData = result.ticketData;
+
+            if (isBuy && ticketData) {
+                ticketData.walletAddress = addressDisplay;
+                await saveTicketData(interaction.guildId, ticketChannel.id, ticketData).catch(() => null);
+            }
 
             // Increment daily P2P ticket count
             const today = new Date().toISOString().split('T')[0];
@@ -286,16 +292,23 @@ export const p2pDetailsModalHandler = {
                 .setColor(isBuy ? '#2ECC71' : '#E74C3C')
                 .setFooter({ text: 'ICN P2P Trade System • Keep all trade chats inside this channel' });
 
-            if (isBuy && addressDisplay !== 'N/A') {
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(addressDisplay)}`;
-                summaryEmbed.setThumbnail(qrUrl);
-            }
-
             const controlsRow = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId('p2p_autolog_ticket_btn')
                     .setLabel('⚡ Auto-Log Deal Proof')
-                    .setStyle(ButtonStyle.Success),
+                    .setStyle(ButtonStyle.Success)
+            );
+
+            if (isBuy) {
+                controlsRow.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('p2p_show_qr_btn')
+                        .setLabel('🔍 View Wallet QR')
+                        .setStyle(ButtonStyle.Primary)
+                );
+            }
+
+            controlsRow.addComponents(
                 new ButtonBuilder()
                     .setCustomId('ticket_close')
                     .setLabel('🔒 Close Ticket')

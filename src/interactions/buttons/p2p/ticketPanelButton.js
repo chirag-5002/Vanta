@@ -258,6 +258,58 @@ export const p2pAutologTicketButtonHandler = {
     }
 };
 
+// ==================== SHOW WALLET QR BUTTON ====================
+
+export const p2pShowQrButtonHandler = {
+    name: 'p2p_show_qr_btn',
+    async execute(interaction, client, args) {
+        // Defer response ephemerally
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        try {
+            const { getP2PConfig } = await import('../../../services/p2pService.js');
+            const { getTicketData } = await import('../../../utils/database.js');
+            const config = await getP2PConfig(interaction.guildId);
+
+            // Permission check: Only staff or admins can view the QR code
+            const hasManageGuild = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) || false;
+            const hasStaffRole = config.staffRoleId && interaction.member
+                ? (interaction.member.roles?.cache?.has ? interaction.member.roles.cache.has(config.staffRoleId) : Array.isArray(interaction.member.roles) && interaction.member.roles.includes(config.staffRoleId))
+                : false;
+
+            if (!hasManageGuild && !hasStaffRole) {
+                await interaction.editReply({ content: '❌ Only verified staff/middleman can view the wallet QR code.' });
+                return;
+            }
+
+            const ticketData = await getTicketData(interaction.guildId, interaction.channel.id).catch(() => null);
+            if (!ticketData || !ticketData.walletAddress) {
+                await interaction.editReply({ content: '❌ Wallet address not found for this ticket.' });
+                return;
+            }
+
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(ticketData.walletAddress)}`;
+
+            const qrEmbed = new EmbedBuilder()
+                .setTitle('🔍 User Wallet Details (Staff Only)')
+                .setDescription(
+                    `Here is the user's receiving wallet address for this trade.\n` +
+                    `You can scan the QR code below or copy the address directly.\n\n` +
+                    `**Wallet Address:**\n\`${ticketData.walletAddress}\``
+                )
+                .setThumbnail(qrUrl)
+                .setColor('#2ECC71')
+                .setFooter({ text: 'Staff Verification Tool • Visible only to you' });
+
+            await interaction.editReply({ embeds: [qrEmbed] });
+
+        } catch (err) {
+            logger.error('Failed to show wallet QR via button:', err);
+            await interaction.editReply({ content: `❌ Failed to show QR code: ${err.message}` });
+        }
+    }
+};
+
 export default [
     buyPriceButtonHandler,
     sellPriceButtonHandler,
@@ -268,4 +320,5 @@ export default [
     wizardProceedButtonHandler,
     wizardCancelButtonHandler,
     p2pAutologTicketButtonHandler,
+    p2pShowQrButtonHandler,
 ];
