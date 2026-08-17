@@ -54,12 +54,9 @@ export const vouchModalHandler = {
         const guildChannels = await interaction.guild.channels.fetch().catch(() => null) || interaction.guild.channels.cache;
         let targetVouchChannel = guildChannels.find(c => 
             c && c.type === ChannelType.GuildText && 
-            (c.name.toLowerCase() === 'feedback-comment' || 
-             c.name.toLowerCase().includes('feedback-comment') ||
-             c.name.toLowerCase() === 'feedback' ||
-             c.name.toLowerCase() === 'feedbacks' ||
-             c.name.toLowerCase() === 'vouch' ||
-             c.name.toLowerCase() === 'vouches')
+            (c.name.toLowerCase().includes('feedback-comment') ||
+             c.name.toLowerCase().includes('feedback') ||
+             c.name.toLowerCase().includes('vouch'))
         );
 
         // Fallback to configured vouch channel or interaction channel
