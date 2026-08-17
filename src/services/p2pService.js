@@ -592,11 +592,12 @@ export async function sendVouchMessagesAndScheduleClose(channel, dealRecord) {
     // Schedule auto-close in 30 minutes (1800000 ms)
     setTimeout(async () => {
         try {
-            const exists = channel.guild.channels.cache.has(channel.id);
-            if (!exists) return;
+            const freshChannel = channel.guild.channels.cache.get(channel.id) || 
+                                 await channel.guild.channels.fetch(channel.id).catch(() => null);
+            if (!freshChannel) return;
 
             const { closeTicket } = await import('./ticket.js');
-            await closeTicket(channel, channel.client.user, 'Auto-logged P2P Deal complete.');
+            await closeTicket(freshChannel, channel.client.user, 'Auto-logged P2P Deal complete.');
 
             const { cleanP2PPortalChannels } = await import('./p2pService.js');
             await cleanP2PPortalChannels(channel.guild).catch(() => null);
