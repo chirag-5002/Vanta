@@ -1,6 +1,6 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, MessageFlags, ChannelType } from 'discord.js';
 import { createTicket } from '../../../services/ticket.js';
-import { getFromDb, setInDb, getP2PUserStatsKey, saveTicketData } from '../../../utils/database.js';
+import { getFromDb, setInDb, getP2PUserStatsKey } from '../../../utils/database.js';
 import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed } from '../../../services/p2pService.js';
 import { logger } from '../../../utils/logger.js';
 import { errorEmbed } from '../../../utils/embeds.js';
@@ -171,12 +171,6 @@ export const p2pDetailsModalHandler = {
             );
 
             const ticketChannel = result.channel;
-            const ticketData = result.ticketData;
-
-            if (isBuy && ticketData) {
-                ticketData.walletAddress = addressDisplay;
-                await saveTicketData(interaction.guildId, ticketChannel.id, ticketData).catch(() => null);
-            }
 
             // Increment daily P2P ticket count
             const today = new Date().toISOString().split('T')[0];
@@ -295,19 +289,7 @@ export const p2pDetailsModalHandler = {
                 new ButtonBuilder()
                     .setCustomId('p2p_autolog_ticket_btn')
                     .setLabel('⚡ Auto-Log Deal Proof')
-                    .setStyle(ButtonStyle.Success)
-            );
-
-            if (isBuy) {
-                controlsRow.addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('p2p_show_qr_btn')
-                        .setLabel('🔍 View Wallet QR')
-                        .setStyle(ButtonStyle.Primary)
-                );
-            }
-
-            controlsRow.addComponents(
+                    .setStyle(ButtonStyle.Success),
                 new ButtonBuilder()
                     .setCustomId('ticket_close')
                     .setLabel('🔒 Close Ticket')
@@ -322,6 +304,17 @@ export const p2pDetailsModalHandler = {
 
             // 4. Auto-dispatch Payment QR Code / Bank Details or Deposit Wallet
             if (isBuy) {
+                const verificationEmbed = new EmbedBuilder()
+                    .setTitle('📸 Wallet Verification Required')
+                    .setDescription(
+                        `To ensure 100% safety and avoid any transaction errors, please upload a **screenshot of your wallet QR code** (or share a photo of it) in this channel now.\n\n` +
+                        `⚠️ **Important:** Our staff will double-check your typed wallet address against this image before sending any USDT.`
+                    )
+                    .setColor('#FFC107')
+                    .setFooter({ text: 'Security Protocol • Typos can lead to loss of funds' });
+
+                await ticketChannel.send({ embeds: [verificationEmbed] });
+
                 const totalInr = amountVal * buyPrice;
                 let fee = 0;
                 if (isKyc) {
