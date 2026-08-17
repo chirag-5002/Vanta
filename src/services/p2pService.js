@@ -538,13 +538,18 @@ export async function sendVouchMessagesAndScheduleClose(channel, dealRecord) {
         (c.name.toLowerCase().includes('snap') || c.name.toLowerCase().includes('screenshot'))
     );
 
+    // Resolve the human user (ticket creator)
+    const botId = channel.client.user.id;
+    const humanUserId = (dealRecord.buyerId === 'server' || dealRecord.buyerId === botId) ? dealRecord.sellerId : dealRecord.buyerId;
+
     const successEmbedObj = new EmbedBuilder()
         .setTitle('🎉 Transaction Complete')
         .setDescription(
             `Thank you for trading with **ICN**! 🎉\n\n` +
             `The trade of **${dealRecord.usdtAmount} USDT** has been marked as complete and logged.\n\n` +
             `• **⭐ Submit Vouch:** Please click below to submit feedback about your experience.\n` +
-            `• **📸 Share Snaps:** Please click below to upload your payment screenshot/receipt in the ${snapsChannel ? `<#${snapsChannel.id}>` : '#transaction-snaps'} channel.`
+            `• **📸 Share Snaps:** Please click below to upload your payment screenshot/receipt in the ${snapsChannel ? `<#${snapsChannel.id}>` : '#transaction-snaps'} channel.\n\n` +
+            `🕒 **Notice:** This ticket will be automatically closed in **30 minutes**. Please copy any details you need.`
         )
         .setColor('#2ECC71')
         .setTimestamp();
@@ -577,6 +582,11 @@ export async function sendVouchMessagesAndScheduleClose(channel, dealRecord) {
     await channel.send({
         embeds: [successEmbedObj],
         components: [ticketComponents]
+    }).catch(() => null);
+
+    // Ping the user so they are aware the ticket will close in 30 minutes
+    await channel.send({
+        content: `🔔 <@${humanUserId}>, transaction complete! This ticket will automatically close in **30 minutes**.`
     }).catch(() => null);
 
     // Schedule auto-close in 30 minutes (1800000 ms)

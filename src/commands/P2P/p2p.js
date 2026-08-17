@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents } from '../../services/p2pService.js';
+import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents, sendVouchMessagesAndScheduleClose } from '../../services/p2pService.js';
 import { getTicketData, saveTicketData, deleteFromDb } from '../../utils/database.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -120,7 +120,7 @@ export default {
                 )
                 .addStringOption(option =>
                     option.setName('ping')
-                        .setDescription('Ping option for price update message')
+                        .setDescription('Ping option for price update message (Default: @everyone)')
                         .setRequired(false)
                         .addChoices(
                             { name: 'None', value: 'none' },
@@ -569,7 +569,7 @@ async function handlePriceUpdate(interaction) {
     const buyPrice = interaction.options.getNumber('buy_price');
     const sellPrice = interaction.options.getNumber('sell_price');
     const symbol = interaction.options.getString('currency') || '₹';
-    const pingOption = interaction.options.getString('ping') || 'none';
+    const pingOption = interaction.options.getString('ping') || '@everyone';
     const channelOverride = interaction.options.getChannel('channel');
     const paymentMethods = interaction.options.getString('payment_methods');
 
@@ -680,6 +680,12 @@ async function handleAutoLog(interaction) {
     if (ticketData) {
         ticketData.dealCompleted = true;
         await saveTicketData(interaction.guildId, interaction.channel.id, ticketData).catch(() => null);
+    }
+
+    const channelName = interaction.channel.name?.toLowerCase() || '';
+    const isTicket = channelName.includes('ticket') || channelName.startsWith('buy-') || channelName.startsWith('sell-') || channelName.startsWith('p2p-');
+    if (isTicket) {
+        await sendVouchMessagesAndScheduleClose(interaction.channel, dealRecord).catch(() => null);
     }
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
@@ -832,6 +838,12 @@ async function handleDeal(interaction) {
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
 
+    const name = interaction.channel?.name?.toLowerCase() || '';
+    const isTicket = name.includes('ticket') || name.startsWith('buy-') || name.startsWith('sell-') || name.startsWith('p2p-');
+    if (isTicket) {
+        await sendVouchMessagesAndScheduleClose(interaction.channel, dealRecord).catch(() => null);
+    }
+
     if (targetChannel.id !== interaction.channel?.id) {
         let sentMsg;
         try {
@@ -848,7 +860,7 @@ async function handleDeal(interaction) {
             });
         }
 
-        if (interaction.channel) {
+        if (!isTicket && interaction.channel) {
             const successEmbedObj = new EmbedBuilder()
                 .setTitle('🎉 Transaction Complete')
                 .setDescription(

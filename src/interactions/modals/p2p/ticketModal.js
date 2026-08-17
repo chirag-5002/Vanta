@@ -252,7 +252,8 @@ export const p2pDetailsModalHandler = {
                     `> **6. Payment Method:** \`${paymentMethod}\``,
                     `> **7. Crypto Network:** \`${networkLabel}\``,
                     `> **8. Your Receiving Wallet Address:** \`${addressDisplay}\``,
-                    `> **Security:** \`Auto-MM Protected Trade\``
+                    `> **Security:** \`Auto-MM Protected Trade\`\n`,
+                    `💡 **Action Required:** <@${interaction.user.id}>, please upload a **screenshot** of your receiving wallet address (showing the address & QR code) from your wallet app (e.g. Trust Wallet, MetaMask) to verify and prevent typos.`
                 ].join('\n');
             } else {
                 const netUsdtForPayout = amountVal;
@@ -284,6 +285,11 @@ export const p2pDetailsModalHandler = {
                 .setDescription(cardDescription)
                 .setColor(isBuy ? '#2ECC71' : '#E74C3C')
                 .setFooter({ text: 'ICN P2P Trade System • Keep all trade chats inside this channel' });
+
+            if (isBuy && addressDisplay !== 'N/A') {
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(addressDisplay)}`;
+                summaryEmbed.setThumbnail(qrUrl);
+            }
 
             const controlsRow = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
