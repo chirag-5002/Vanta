@@ -50,17 +50,22 @@ export const vouchModalHandler = {
         vouchEmbed.setFooter({ text: 'ICN P2P Trust Network | Verified Vouch' });
         vouchEmbed.setTimestamp();
 
-        // Target vouch channel: first search for #feedback-comment
+        // Target vouch channel: first search for feedback/vouch names
         const guildChannels = await interaction.guild.channels.fetch().catch(() => null) || interaction.guild.channels.cache;
         let targetVouchChannel = guildChannels.find(c => 
             c && c.type === ChannelType.GuildText && 
-            (c.name.toLowerCase() === 'feedback-comment' || c.name.toLowerCase().includes('feedback-comment'))
+            (c.name.toLowerCase() === 'feedback-comment' || 
+             c.name.toLowerCase().includes('feedback-comment') ||
+             c.name.toLowerCase() === 'feedback' ||
+             c.name.toLowerCase() === 'feedbacks' ||
+             c.name.toLowerCase() === 'vouch' ||
+             c.name.toLowerCase() === 'vouches')
         );
 
         // Fallback to configured vouch channel or interaction channel
         if (!targetVouchChannel) {
             targetVouchChannel = config.vouchChannelId
-                ? interaction.guild.channels.cache.get(config.vouchChannelId)
+                ? guildChannels.get(config.vouchChannelId)
                 : interaction.channel;
         }
 
@@ -68,7 +73,7 @@ export const vouchModalHandler = {
             try {
                 await targetVouchChannel.send({ embeds: [vouchEmbed] });
             } catch (err) {
-                logger.error('Failed to send vouch embed to channel', { error: err.message });
+                logger.error('Failed to send vouch embed to channel', { error: err.message, channelId: targetVouchChannel.id });
             }
         }
 
