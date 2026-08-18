@@ -639,16 +639,9 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
     const description = [
         `> **Between:** ${buyerMention} and ${sellerMention}`,
         `> **Amount:** ≈ ${usdVal} / ${usdtVal}`,
-        `> **Deal Info:** ${dealInfoText}`
-    ];
-
-    if (revealUsers || deal.txHash) {
-        description.push(`> **Tx Hash:** ${txFormatted}`);
-    }
-
-    description.push(`> **Status:** \`${statusText}\``);
-
-    const descriptionText = description.join('\n');
+        `> **Deal Info:** ${dealInfoText}`,
+        `> **Status:** \`${statusText}\``
+    ].join('\n');
 
     const now = new Date();
     const timestampText = now.toLocaleString('en-US', {
@@ -669,7 +662,7 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
 
     const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(descriptionText)
+        .setDescription(description)
         .setColor(embedColor)
         .setFooter({ text: finalFooterText });
 
