@@ -517,6 +517,9 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
         await sendVouchMessagesAndScheduleClose(channel, dealRecord).catch(() => null);
     }
 
+    // Post to transaction-details if it exists
+    await sendTransactionDetailsLog(channel.guild, dealRecord).catch(() => null);
+
     return dealRecord;
 }
 
@@ -610,7 +613,7 @@ export async function sendVouchMessagesAndScheduleClose(channel, dealRecord) {
 /**
  * Builds the P2P Deal Log Embed matching reference design.
  */
-export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate = null, guild = null) {
+export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate = null, guild = null, revealUsers = false) {
     const title = config.titleText || 'Successful Transaction';
     const embedColor = config.embedColor || '#FFC107';
 
@@ -624,17 +627,28 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
 
     const botId = guild?.client?.user?.id;
 
-    // Show bot as mention (e.g. @USDT MarketPlace) and human trader as raw ID in code block (e.g. `123456789`)
+    // Show bot as mention (e.g. @USDT MarketPlace) and human trader as raw ID in code block or mention
     const botLabel = '@USDT MarketPlace';
-    const buyerMention = (deal.buyerId === 'server' || deal.buyerId === botId) ? botLabel : `\`${deal.buyerId}\``;
-    const sellerMention = (deal.sellerId === 'server' || deal.sellerId === botId) ? botLabel : `\`${deal.sellerId}\``;
+    const buyerMention = (deal.buyerId === 'server' || deal.buyerId === botId) 
+        ? botLabel 
+        : (revealUsers ? `<@${deal.buyerId}>` : `\`${deal.buyerId}\``);
+    const sellerMention = (deal.sellerId === 'server' || deal.sellerId === botId) 
+        ? botLabel 
+        : (revealUsers ? `<@${deal.sellerId}>` : `\`${deal.sellerId}\``);
 
     const description = [
         `> **Between:** ${buyerMention} and ${sellerMention}`,
         `> **Amount:** ≈ ${usdVal} / ${usdtVal}`,
-        `> **Deal Info:** ${dealInfoText}`,
-        `> **Status:** \`${statusText}\``
-    ].join('\n');
+        `> **Deal Info:** ${dealInfoText}`
+    ];
+
+    if (revealUsers || deal.txHash) {
+        description.push(`> **Tx Hash:** ${txFormatted}`);
+    }
+
+    description.push(`> **Status:** \`${statusText}\``);
+
+    const descriptionText = description.join('\n');
 
     const now = new Date();
     const timestampText = now.toLocaleString('en-US', {
@@ -655,7 +669,7 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
 
     const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(description)
+        .setDescription(descriptionText)
         .setColor(embedColor)
         .setFooter({ text: finalFooterText });
 
@@ -983,3 +997,34 @@ export async function resolveLatestPrices(guild) {
     
     return { buyPrice: 105, sellPrice: 98 };
 }
+
+/**
+ * Sends transaction complete detailed log messages with unmasked user mentions to the #transaction-details channel.
+ */
+export async function sendTransactionDetailsLog(guild, deal) {
+    if (!guild || !deal) return;
+    try {
+        const guildChannels = await guild.channels.fetch().catch(() => null) || guild.channels.cache;
+        if (!guildChannels) return;
+
+        const targetChannel = guildChannels.find(c => 
+            c && c.type === ChannelType.GuildText && 
+            c.name.toLowerCase() === 'transaction-details'
+        );
+
+        if (!targetChannel) {
+            logger.warn(`[P2P] 'transaction-details' channel not found in guild ${guild.id}`);
+            return;
+        }
+
+        const config = await getP2PConfig(guild.id).catch(() => null);
+        const embed = buildDealEmbed(deal, config || DEFAULT_P2P_CONFIG, null, guild, true);
+
+        await targetChannel.send({
+            embeds: [embed]
+        });
+    } catch (err) {
+        logger.error('[P2P] Failed to send transaction details log:', err);
+    }
+}
+

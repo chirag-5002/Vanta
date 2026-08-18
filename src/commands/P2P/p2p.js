@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents, sendVouchMessagesAndScheduleClose } from '../../services/p2pService.js';
+import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents, sendVouchMessagesAndScheduleClose, sendTransactionDetailsLog } from '../../services/p2pService.js';
 import { getTicketData, saveTicketData, deleteFromDb } from '../../utils/database.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -690,6 +690,9 @@ async function handleAutoLog(interaction) {
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
 
+    // Post to transaction-details if it exists
+    await sendTransactionDetailsLog(interaction.guild, dealRecord).catch(() => null);
+
     if (targetChannel && targetChannel.id !== interaction.channel?.id) {
         const sentMsg = await targetChannel.send({
             embeds: [dealEmbed]
@@ -706,6 +709,7 @@ async function handleAutoLog(interaction) {
             ]
         });
     } else {
+        const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
         return await InteractionHelper.safeEditReply(interaction, {
             embeds: [dealEmbed],
             components: [componentsRow]
@@ -838,6 +842,9 @@ async function handleDeal(interaction) {
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
 
+    // Post to transaction-details if it exists
+    await sendTransactionDetailsLog(interaction.guild, dealRecord).catch(() => null);
+
     const name = interaction.channel?.name?.toLowerCase() || '';
     const isTicket = name.includes('ticket') || name.startsWith('buy-') || name.startsWith('sell-') || name.startsWith('p2p-');
     if (isTicket) {
@@ -894,6 +901,7 @@ async function handleDeal(interaction) {
             ]
         });
     } else {
+        const componentsRow = buildDealComponents(config.vouchChannelId, dealRecord.dealId);
         return await InteractionHelper.safeEditReply(interaction, {
             embeds: [dealEmbed],
             components: [componentsRow]
