@@ -304,17 +304,6 @@ export const p2pDetailsModalHandler = {
 
             // 4. Auto-dispatch Payment QR Code / Bank Details or Deposit Wallet
             if (isBuy) {
-                const verificationEmbed = new EmbedBuilder()
-                    .setTitle('📸 Wallet Verification Required')
-                    .setDescription(
-                        `To ensure 100% safety and avoid any transaction errors, please upload a **screenshot of your wallet QR code** (or share a photo of it) in this channel now.\n\n` +
-                        `⚠️ **Important:** Our staff will double-check your typed wallet address against this image before sending any USDT.`
-                    )
-                    .setColor('#FFC107')
-                    .setFooter({ text: 'Security Protocol • Typos can lead to loss of funds' });
-
-                await ticketChannel.send({ embeds: [verificationEmbed] });
-
                 const totalInr = amountVal * buyPrice;
                 let fee = 0;
                 if (isKyc) {
@@ -333,6 +322,18 @@ export const p2pDetailsModalHandler = {
                 const receiveUsdt = amountVal - fee;
                 const paymentEmbed = buildBuyPaymentEmbed(paymentMethod, paymentConfig, totalInr, receiveUsdt);
                 await ticketChannel.send({ embeds: [paymentEmbed] });
+
+                // Initialize ticket P2P state to waiting_payment_proof
+                try {
+                    const { getTicketData, saveTicketData } = await import('../../../utils/database.js');
+                    const ticketData = await getTicketData(interaction.guildId, ticketChannel.id).catch(() => null);
+                    if (ticketData) {
+                        ticketData.p2pStep = 'waiting_payment_proof';
+                        await saveTicketData(interaction.guildId, ticketChannel.id, ticketData);
+                    }
+                } catch (err) {
+                    logger.error('Failed to set initial P2P step:', err);
+                }
             } else {
                 const netUsdtForPayout = amountVal;
                 let totalInrPayout = netUsdtForPayout * sellPrice;

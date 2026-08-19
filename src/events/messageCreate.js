@@ -244,25 +244,75 @@ async function handleReceiptUpload(message, client) {
 
     if (!isCreator) return;
 
-    // Prevent duplicate receipt messages (one per ticket) using transient client memory
-    if (!client.p2pReceipts) {
-      client.p2pReceipts = new Set();
+    const isBuy = ticketData.reason?.startsWith('Buy');
+
+    if (isBuy) {
+      const { saveTicketData } = await import('../utils/database.js');
+      const step = ticketData.p2pStep || 'waiting_payment_proof';
+
+      if (step === 'waiting_payment_proof') {
+        const embed = new EmbedBuilder()
+          .setTitle('📥 Payment Receipt Received')
+          .setDescription(
+            `Thank you for uploading your payment screenshot. Our team will verify your payment shortly.\n\n` +
+            `> **Verification Status:** \`Pending Verification\`\n` +
+            `> **Estimated Time:** \`Up to 1 hour (max)\` to complete the transaction.`
+          )
+          .setColor('#FFC107')
+          .setFooter({ text: 'ICN P2P Auto-MM • Keep chats inside this channel' });
+
+        await message.channel.send({ embeds: [embed] });
+
+        // Ask for Wallet QR code next
+        const verificationEmbed = new EmbedBuilder()
+          .setTitle('📸 Wallet Verification Required')
+          .setDescription(
+            `To ensure 100% safety and avoid any transaction errors, please upload a **screenshot of your wallet QR code** (or share a photo of it) in this channel now.\n\n` +
+            `⚠️ **Important:** Our staff will double-check your typed wallet address against this image before sending any USDT.`
+          )
+          .setColor('#FFC107')
+          .setFooter({ text: 'Security Protocol • Typos can lead to loss of funds' });
+
+        await message.channel.send({ embeds: [verificationEmbed] });
+
+        ticketData.p2pStep = 'waiting_wallet_qr';
+        await saveTicketData(message.guild.id, message.channel.id, ticketData);
+      } 
+      else if (step === 'waiting_wallet_qr') {
+        const walletReceivedEmbed = new EmbedBuilder()
+          .setTitle('✅ Wallet QR Code Received')
+          .setDescription(
+            `Thank you for uploading your wallet QR code. Our staff will double-check your wallet address against this image shortly.`
+          )
+          .setColor('#2ECC71')
+          .setFooter({ text: 'Security Protocol • Verification in progress' });
+
+        await message.channel.send({ embeds: [walletReceivedEmbed] });
+
+        ticketData.p2pStep = 'completed';
+        await saveTicketData(message.guild.id, message.channel.id, ticketData);
+      }
+    } else {
+      // Prevent duplicate receipt messages (one per ticket) using transient client memory
+      if (!client.p2pReceipts) {
+        client.p2pReceipts = new Set();
+      }
+      
+      if (client.p2pReceipts.has(message.channel.id)) return;
+      client.p2pReceipts.add(message.channel.id);
+
+      const embed = new EmbedBuilder()
+        .setTitle('📥 Payment Receipt Received')
+        .setDescription(
+          `Thank you for uploading your payment screenshot. Our team will verify your payment shortly.\n\n` +
+          `> **Verification Status:** \`Pending Verification\`\n` +
+          `> **Estimated Time:** \`Up to 1 hour (max)\` to complete the transaction.`
+        )
+        .setColor('#FFC107')
+        .setFooter({ text: 'ICN P2P Auto-MM • Keep chats inside this channel' });
+
+      await message.channel.send({ embeds: [embed] });
     }
-    
-    if (client.p2pReceipts.has(message.channel.id)) return;
-    client.p2pReceipts.add(message.channel.id);
-
-    const embed = new EmbedBuilder()
-      .setTitle('📥 Payment Receipt Received')
-      .setDescription(
-        `Thank you for uploading your payment screenshot. Our team will verify your payment shortly.\n\n` +
-        `> **Verification Status:** \`Pending Verification\`\n` +
-        `> **Estimated Time:** \`Up to 1 hour (max)\` to complete the transaction.`
-      )
-      .setColor('#FFC107')
-      .setFooter({ text: 'ICN P2P Auto-MM • Keep chats inside this channel' });
-
-    await message.channel.send({ embeds: [embed] });
   } catch (err) {
     logger.debug('Receipt Upload Listener skipped:', err.message);
   }
