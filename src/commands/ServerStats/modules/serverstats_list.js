@@ -1,7 +1,7 @@
 import { getColor } from '../../../config/bot.js';
 import { PermissionFlagsBits } from 'discord.js';
 import { createEmbed } from '../../../utils/embeds.js';
-import { getServerCounters, saveServerCounters, getCounterEmoji as getCounterTypeEmoji, getCounterTypeLabel, getGuildCounterStats } from '../../../services/serverstatsService.js';
+import { getServerCounters, saveServerCounters, getCounterEmoji as getCounterTypeEmoji, getCounterTypeLabel, getCounterCount } from '../../../services/serverstatsService.js';
 import { logger } from '../../../utils/logger.js';
 
 import { InteractionHelper } from '../../../utils/interactionHelper.js';
@@ -23,7 +23,6 @@ export async function handleList(interaction, client) {
 
     try {
         const counters = await getServerCounters(client, guild.id);
-        const stats = await getGuildCounterStats(guild);
 
         const validCounters = [];
         const orphanedCounters = [];
@@ -52,13 +51,23 @@ export async function handleList(interaction, client) {
 
             embed.addFields({
                 name: "**Available Counter Types**",
-                value: "**Members + Bots** - Total server members\n **Members Only** - Human members only\n **Bots Only** - Bot members only",
+                value: "**Members + Bots** - Total server members (`members`)\n" +
+                       "**Members Only** - Human members only (`members_only`)\n" +
+                       "**Bots Only** - Bot members only (`bots`)\n" +
+                       "**Calendar Date** - Sidebar date tracker (`calendar`)\n" +
+                       "**Total Traders** - P2P traders count (`traders`)\n" +
+                       "**Active Now** - Online members (`active`)\n" +
+                       "**KYC Verified** - KYC verified users count (`kyc_count`)\n" +
+                       "**Total Transactions** - Completed P2P transactions (`transactions`)\n" +
+                       "**USDT Volume** - Total USDT volume processed (`usdt_volume`)",
                 inline: false
             });
 
             embed.addFields({
                 name: "**Usage Examples**",
-                value: "`/serverstats create type:members channel_type:voice category:Stats`\n`/serverstats create type:bots channel_type:text category:Server Info`\n`/serverstats list`",
+                value: "`/serverstats create type:members channel_type:voice category:Stats`\n" +
+                       "`/serverstats create type:usdt_volume channel_type:voice category:Stats view_role:@VIP`\n" +
+                       "`/serverstats list`",
                 inline: false
             });
 
@@ -76,31 +85,30 @@ export async function handleList(interaction, client) {
             color: getColor('info')
         });
 
-        for (let i = 0; i < validCounters.length; i++) {
-            const counter = validCounters[i];
+        const counterFieldsPromises = validCounters.map(async (counter, index) => {
             const channel = guild.channels.cache.get(counter.channelId);
-            
-            if (!channel) {
-                
-                logger.warn(`Counter ${counter.id} still has missing channel after cleanup`);
-                continue;
-            }
+            if (!channel) return null;
 
-            const currentCount = getCurrentCount(stats, counter.type);
-            const status = channel.name.includes(':') ? '✅ Active' : '⚠️ Not Updated';
-            
-            embed.addFields({
-                name: `${getCounterTypeEmoji(counter.type)} Counter #${i + 1} - ${channel.name}`,
-                value: `**ID:** \`${counter.id}\`\n**Type:** ${getCounterTypeDisplay(counter.type)}\n**Channel:** ${channel}\n**Current Count:** ${currentCount}\n**Status:** ${status}\n**Created:** ${new Date(counter.createdAt).toLocaleDateString()}`,
+            const rawCount = await getCounterCount(guild, counter.type);
+            const currentCount = typeof rawCount === 'number' ? rawCount.toLocaleString('en-US') : rawCount;
+            const status = (channel.name.includes(':') || channel.name.includes('·')) ? '✅ Active' : '⚠️ Not Updated';
+            const viewRoleText = counter.viewRoleId ? `\n**Restricted Role:** <@&${counter.viewRoleId}>` : '';
+
+            return {
+                name: `${getCounterTypeEmoji(counter.type)} Counter #${index + 1} - ${channel.name}`,
+                value: `**ID:** \`${counter.id}\`\n**Type:** ${getCounterTypeDisplay(counter.type)}\n**Channel:** ${channel}\n**Current Value:** ${currentCount}${viewRoleText}\n**Status:** ${status}\n**Created:** ${new Date(counter.createdAt).toLocaleDateString()}`,
                 inline: false
-            });
-        }
+            };
+        });
+
+        const counterFields = (await Promise.all(counterFieldsPromises)).filter(Boolean);
+        embed.addFields(counterFields);
 
         embed.addFields({
             name: "**Statistics**",
             value: `**Total Counters:** ${validCounters.length}\n**Active Counters:** ${validCounters.filter(c => {
                 const channel = guild.channels.cache.get(c.channelId);
-                return channel && channel.name.includes(':');
+                return channel && (channel.name.includes(':') || channel.name.includes('·'));
             }).length}\n**Next Update:** <t:${Math.floor(Date.now() / 1000) + 900}:R>`,
             inline: false
         });
@@ -126,21 +134,4 @@ export async function handleList(interaction, client) {
 
 function getCounterTypeDisplay(type) {
     return `${getCounterTypeEmoji(type)} ${getCounterTypeLabel(type)}`;
-}
-
-function getCounterEmoji(type) {
-    return getCounterTypeEmoji(type);
-}
-
-function getCurrentCount(stats, type) {
-    switch (type) {
-        case "members":
-            return stats.totalCount;
-        case "bots":
-            return stats.botCount;
-        case "members_only":
-            return stats.humanCount;
-        default:
-            return 0;
-    }
 }

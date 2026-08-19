@@ -10,6 +10,7 @@ export async function handleCreate(interaction, client) {
     const type = interaction.options.getString("type");
     const channelType = interaction.options.getString("channel_type");
     const category = interaction.options.getChannel("category");
+    const viewRole = interaction.options.getRole("view_role");
 
     try {
         await InteractionHelper.safeDefer(interaction);
@@ -42,10 +43,29 @@ export async function handleCreate(interaction, client) {
             return;
         }
 
+        const permissionOverwrites = [];
+        if (viewRole) {
+            permissionOverwrites.push(
+                {
+                    id: guild.roles.everyone.id,
+                    deny: [PermissionFlagsBits.ViewChannel],
+                },
+                {
+                    id: viewRole.id,
+                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
+                },
+                {
+                    id: client.user.id,
+                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels],
+                }
+            );
+        }
+
         const targetChannel = await guild.channels.create({
             name: baseChannelName,
             type: targetChannelType,
             parent: category.id,
+            permissionOverwrites: permissionOverwrites.length > 0 ? permissionOverwrites : undefined,
             reason: `Counter channel created by ${interaction.user.tag}`
         });
 
@@ -61,7 +81,8 @@ export async function handleCreate(interaction, client) {
             channelId: targetChannel.id,
             guildId: guild.id,
             createdAt: new Date().toISOString(),
-            enabled: true
+            enabled: true,
+            viewRoleId: viewRole ? viewRole.id : null
         };
 
         counters.push(newCounter);

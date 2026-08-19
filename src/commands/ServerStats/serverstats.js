@@ -7,6 +7,7 @@ import { handleCreate } from './modules/serverstats_create.js';
 import { handleList } from './modules/serverstats_list.js';
 import { handleUpdate } from './modules/serverstats_update.js';
 import { handleDelete } from './modules/serverstats_delete.js';
+import { handlePreset } from './modules/serverstats_preset.js';
 
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -27,7 +28,13 @@ export default {
                         .addChoices(
                             { name: "members + bots", value: "members" },
                             { name: "members only", value: "members_only" },
-                            { name: "bots only", value: "bots" }
+                            { name: "bots only", value: "bots" },
+                            { name: "calendar date", value: "calendar" },
+                            { name: "total traders", value: "traders" },
+                            { name: "active now", value: "active" },
+                            { name: "kyc verified", value: "kyc_count" },
+                            { name: "total transactions", value: "transactions" },
+                            { name: "usdt volume", value: "usdt_volume" }
                         )
                 )
                 .addStringOption(option =>
@@ -46,6 +53,12 @@ export default {
                         .setDescription("The category where the statistics tracker channel will be created")
                         .setRequired(true)
                         .addChannelTypes(ChannelType.GuildCategory)
+                )
+                .addRoleOption(option =>
+                    option
+                        .setName("view_role")
+                        .setDescription("Optional role allowed to view this channel (others will be hidden)")
+                        .setRequired(false)
                 )
         )
         .addSubcommand(subcommand =>
@@ -71,7 +84,13 @@ export default {
                         .addChoices(
                             { name: "members + bots", value: "members" },
                             { name: "members only", value: "members_only" },
-                            { name: "bots only", value: "bots" }
+                            { name: "bots only", value: "bots" },
+                            { name: "calendar date", value: "calendar" },
+                            { name: "total traders", value: "traders" },
+                            { name: "active now", value: "active" },
+                            { name: "kyc verified", value: "kyc_count" },
+                            { name: "total transactions", value: "transactions" },
+                            { name: "usdt volume", value: "usdt_volume" }
                         )
                 )
         )
@@ -84,6 +103,23 @@ export default {
                         .setName("counter-id")
                         .setDescription("The ID of the tracker to delete")
                         .setRequired(true)
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName("setup-preset")
+                .setDescription("Automatically set up the complete stats category and all 6 channels")
+                .addStringOption(option =>
+                    option
+                        .setName("category_name")
+                        .setDescription("The name of the category to create (defaults to '📊 ICN=STATS')")
+                        .setRequired(false)
+                )
+                .addRoleOption(option =>
+                    option
+                        .setName("volume_view_role")
+                        .setDescription("Optional role allowed to view the USDT Volume channel (others will be hidden)")
+                        .setRequired(false)
                 )
         ),
 
@@ -102,6 +138,9 @@ export default {
                 break;
             case "delete":
                 await handleDelete(interaction, client);
+                break;
+            case "setup-preset":
+                await handlePreset(interaction, client);
                 break;
             default:
                 await replyUserError(interaction, { type: ErrorTypes.VALIDATION, message: 'Unknown subcommand.' });
