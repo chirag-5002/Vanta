@@ -352,6 +352,19 @@ export async function approveKyc(guild, userId, staffMember, client, interaction
     kycStatus.reviewedAt = new Date().toISOString();
     await saveKycStatus(guild.id, userId, kycStatus);
 
+    // Update KYC counter in real-time
+    try {
+        const { getServerCounters, updateCounter } = await import('./serverstatsService.js');
+        const counters = await getServerCounters(client, guild.id);
+        for (const counter of counters) {
+            if (counter && counter.type === 'kyc_count') {
+                await updateCounter(client, guild, counter);
+            }
+        }
+    } catch (err) {
+        logger.error('Failed to trigger counter update on KYC approval:', err);
+    }
+
     const kycConfig = await getKycConfig(guild.id);
     let roleAssignedMessage = '';
 

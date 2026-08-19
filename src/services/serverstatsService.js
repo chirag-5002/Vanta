@@ -449,3 +449,16 @@ export async function saveServerCounters(client, guildId, counters) {
     return false;
   }
 }
+
+export async function updateP2PCounters(client, guild) {
+  try {
+    const counters = await getServerCounters(client, guild.id);
+    for (const counter of counters) {
+      if (counter && ['traders', 'transactions', 'usdt_volume'].includes(counter.type)) {
+        await updateCounter(client, guild, counter);
+      }
+    }
+  } catch (error) {
+    logger.error('Error updating P2P counters:', error);
+  }
+}

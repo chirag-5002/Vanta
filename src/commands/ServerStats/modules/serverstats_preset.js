@@ -23,10 +23,11 @@ export async function handlePreset(interaction, client) {
     }
 
     try {
-        // 1. Create the category channel
+        // 1. Create the category channel at the very top
         const category = await guild.channels.create({
             name: categoryName,
             type: ChannelType.GuildCategory,
+            position: 0,
             reason: `Stats Preset Category created by ${interaction.user.tag}`
         });
 

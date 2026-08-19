@@ -682,6 +682,13 @@ async function handleAutoLog(interaction) {
         await saveTicketData(interaction.guildId, interaction.channel.id, ticketData).catch(() => null);
     }
 
+    try {
+        const { updateP2PCounters } = await import('../../services/serverstatsService.js');
+        await updateP2PCounters(interaction.client, interaction.guild);
+    } catch (err) {
+        logger.error('Error triggering P2P counters update:', err);
+    }
+
     const channelName = interaction.channel.name?.toLowerCase() || '';
     const isTicket = channelName.includes('ticket') || channelName.startsWith('buy-') || channelName.startsWith('sell-') || channelName.startsWith('p2p-');
     if (isTicket) {
@@ -838,6 +845,13 @@ async function handleDeal(interaction) {
     if (ticketData) {
         ticketData.dealCompleted = true;
         await saveTicketData(interaction.guildId, interaction.channel.id, ticketData).catch(() => null);
+    }
+
+    try {
+        const { updateP2PCounters } = await import('../../services/serverstatsService.js');
+        await updateP2PCounters(interaction.client, interaction.guild);
+    } catch (err) {
+        logger.error('Error triggering P2P counters update:', err);
     }
 
     const dealEmbed = buildDealEmbed(dealRecord, config, null, interaction.guild);
