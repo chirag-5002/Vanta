@@ -201,7 +201,7 @@ export async function autoDeployP2PPanels(guild) {
 
         if (buyChannel) {
             const msgs = await buyChannel.messages.fetch({ limit: 10 }).catch(() => null);
-            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_buy_kyc')) && m.embeds.some(e => e.description?.includes('0.5% fee') && e.description?.includes('Tiered fees')));
+            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_buy_kyc')) && m.embeds.some(e => e.description?.includes('$50 - $499') && e.description?.includes('Tiered fees')));
             
             if (!botHasNewPanel) {
                 if (msgs) {
@@ -216,7 +216,9 @@ export async function autoDeployP2PPanels(guild) {
                     .setDescription(
                         `Welcome to **${guild.name}** USDT Buying Portal!\n\n` +
                         `Select an option below to open an instant 1-on-1 Middleman Buy Ticket:\n\n` +
-                        `• **🟢 Buy with KYC:** Only **0.5% fee** (You receive **99.5%** of requested USDT).\n` +
+                        `• **🟢 Buy with KYC:** Tiered fees apply:\n` +
+                        `  - **$50 - $499:** **$2** flat fee\n` +
+                        `  - **$500 - $10000:** **0.5%** fee of amount\n` +
                         `• **🟢 Buy without KYC:** Tiered fees apply:\n` +
                         `  - **$50 - $100:** **$2** flat fee\n` +
                         `  - **$101 - $500:** **$3** flat fee\n` +
