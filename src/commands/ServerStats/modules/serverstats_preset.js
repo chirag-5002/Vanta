@@ -48,9 +48,18 @@ export async function handlePreset(interaction, client) {
         for (let i = 0; i < presets.length; i++) {
             const preset = presets[i];
 
-            // Avoid creating duplicate types if one already exists
+            // Avoid creating duplicate types if one already exists, but move their channel to the category!
             const duplicate = counters.find(c => c.type === preset.type);
             if (duplicate) {
+                const channel = guild.channels.cache.get(duplicate.channelId);
+                if (channel) {
+                    try {
+                        await channel.setParent(category.id, { lockPermissions: false });
+                        createdChannels.push({ channel, counter: duplicate });
+                    } catch (err) {
+                        logger.error(`Failed to move existing stats channel ${channel.id} to new category:`, err);
+                    }
+                }
                 continue;
             }
 

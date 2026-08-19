@@ -80,17 +80,17 @@ export function formatCounterChannelName(type, count) {
 
   switch (type) {
     case 'calendar':
-      return `│📅 · ${formattedCount}`;
+      return `📅│${formattedCount}`;
     case 'traders':
-      return `│👥 · Total Traders: ${formattedCount}`;
+      return `👥│Total Traders: ${formattedCount}`;
     case 'active':
-      return `│🟢 · Active Now: ${formattedCount}`;
+      return `🟢│Active Now: ${formattedCount}`;
     case 'kyc_count':
-      return `│📰 · KYC Verified: ${formattedCount}`;
+      return `📰│KYC Verified: ${formattedCount}`;
     case 'transactions':
-      return `│🔄 · Transactions: ${formattedCount}`;
+      return `🔄│Transactions: ${formattedCount}`;
     case 'usdt_volume':
-      return `│💰 · USDT Volume: ${formattedCount}`;
+      return `💰│USDT Volume: ${formattedCount}`;
     default: {
       const template = botConfig.counters?.defaults?.channelName || '{name}-{count}';
       const baseName = getCounterBaseName(type);
@@ -169,7 +169,7 @@ export async function getCounterCount(guild, type) {
       const dayName = days[now.getDay()];
       const dateNum = now.getDate();
       const monthName = months[now.getMonth()];
-      return `${dayName}, ${dateNum}${getOrdinalSuffix(dateNum)} ${monthName}`;
+      return `${dayName}, ${monthName} ${dateNum}${getOrdinalSuffix(dateNum)}`;
     }
     case 'active': {
       try {
