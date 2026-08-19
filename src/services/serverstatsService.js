@@ -193,9 +193,13 @@ export async function getCounterCount(guild, type) {
         const { getKycConfig } = await import('./kycService.js');
         const kycConfig = await getKycConfig(guild.id).catch(() => null);
         if (kycConfig && kycConfig.roleId) {
-          const role = guild.roles.cache.get(kycConfig.roleId);
-          if (role) {
-            return role.members.size;
+          try {
+            const membersWithRole = await guild.members.fetch({ role: kycConfig.roleId });
+            if (membersWithRole) {
+              return membersWithRole.size;
+            }
+          } catch (err) {
+            logger.warn(`Failed to fetch role members for KYC stats: ${err.message}`);
           }
         }
         
