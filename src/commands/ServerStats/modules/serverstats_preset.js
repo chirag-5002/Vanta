@@ -55,25 +55,31 @@ export async function handlePreset(interaction, client) {
             }
 
             const baseChannelName = getCounterBaseName(preset.type);
-            const permissionOverwrites = [];
+            const permissionOverwrites = [
+                {
+                    id: guild.roles.everyone.id,
+                    deny: [PermissionFlagsBits.Connect]
+                }
+            ];
 
             // If it is the restricted USDT Volume channel, apply overwrites
             if (preset.restrict && volumeViewRole) {
+                permissionOverwrites[0].deny.push(PermissionFlagsBits.ViewChannel);
                 permissionOverwrites.push(
                     {
-                        id: guild.roles.everyone.id,
-                        deny: [PermissionFlagsBits.ViewChannel],
-                    },
-                    {
                         id: volumeViewRole.id,
-                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
-                    },
-                    {
-                        id: client.user.id,
-                        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels],
+                        allow: [PermissionFlagsBits.ViewChannel],
+                        deny: [PermissionFlagsBits.Connect]
                     }
                 );
             }
+
+            permissionOverwrites.push(
+                {
+                    id: client.user.id,
+                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels]
+                }
+            );
 
             const channel = await guild.channels.create({
                 name: baseChannelName,

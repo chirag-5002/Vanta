@@ -43,23 +43,30 @@ export async function handleCreate(interaction, client) {
             return;
         }
 
-        const permissionOverwrites = [];
+        const permissionOverwrites = [
+            {
+                id: guild.roles.everyone.id,
+                deny: [PermissionFlagsBits.Connect]
+            }
+        ];
+
         if (viewRole) {
+            permissionOverwrites[0].deny.push(PermissionFlagsBits.ViewChannel);
             permissionOverwrites.push(
                 {
-                    id: guild.roles.everyone.id,
-                    deny: [PermissionFlagsBits.ViewChannel],
-                },
-                {
                     id: viewRole.id,
-                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
-                },
-                {
-                    id: client.user.id,
-                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels],
+                    allow: [PermissionFlagsBits.ViewChannel],
+                    deny: [PermissionFlagsBits.Connect]
                 }
             );
         }
+
+        permissionOverwrites.push(
+            {
+                id: client.user.id,
+                allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels]
+            }
+        );
 
         const targetChannel = await guild.channels.create({
             name: baseChannelName,
