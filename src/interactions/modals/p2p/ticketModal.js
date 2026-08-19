@@ -221,8 +221,13 @@ export const p2pDetailsModalHandler = {
                 let fee = 0;
                 let feePercentage = '';
                 if (isKyc) {
-                    fee = amountVal * 0.005;
-                    feePercentage = '0.5%';
+                    if (amountVal < 500) {
+                        fee = 2;
+                        feePercentage = '$2';
+                    } else {
+                        fee = amountVal * 0.005;
+                        feePercentage = '0.5%';
+                    }
                 } else {
                     if (amountVal <= 100) {
                         fee = 2;
@@ -307,7 +312,11 @@ export const p2pDetailsModalHandler = {
                 const totalInr = amountVal * buyPrice;
                 let fee = 0;
                 if (isKyc) {
-                    fee = amountVal * 0.005;
+                    if (amountVal < 500) {
+                        fee = 2;
+                    } else {
+                        fee = amountVal * 0.005;
+                    }
                 } else {
                     if (amountVal <= 100) {
                         fee = 2;
