@@ -1002,7 +1002,8 @@ export async function sendTransactionDetailsLog(guild, deal) {
 
         const targetChannel = guildChannels.find(c => 
             c && c.type === ChannelType.GuildText && 
-            c.name.toLowerCase() === 'transaction-details'
+            (c.name.toLowerCase() === 'transaction-details' || 
+             c.name.toLowerCase().includes('transaction-details'))
         );
 
         if (!targetChannel) {
