@@ -144,3 +144,6 @@ dist
 # Database backup artifacts
 backups/
 *.dump
+
+# Separate Chat Assistant Bot
+vanta-chat-ai/

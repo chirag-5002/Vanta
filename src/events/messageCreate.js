@@ -208,7 +208,8 @@ export default {
 
       await handlePrefixCommand(message, client);
 
-      await handleAutoP2PKeyword(message);
+      // Disabled to prevent automatic completion from messages. Deals must be manually completed via the Auto-Log button.
+      // await handleAutoP2PKeyword(message);
 
       await handleReceiptUpload(message, client);
 
@@ -333,7 +334,7 @@ async function handleAutoP2PKeyword(message) {
     if (!isP2P) return;
 
     const content = message.content || '';
-    const isTxHash = /(0x[a-fA-F0-9]{40,66})|(https?:\/\/(bscscan|etherscan|tronscan|solscan)[^\s]+)/i.test(content);
+    const isTxHash = /(0x[a-fA-F0-9]{64})|(https?:\/\/(bscscan|etherscan|tronscan|solscan)[^\s]+)/i.test(content);
     const isKeyword = /(deal done|complete deal|trade complete|deal completed|usdt sent)/i.test(content);
 
     if (isTxHash || isKeyword) {

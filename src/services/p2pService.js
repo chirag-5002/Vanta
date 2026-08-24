@@ -372,7 +372,7 @@ export async function autoDetectDealFromChannel(channel, guildId) {
                 userCreatorId = humanList[0];
             }
 
-            const txRegex = /(0x[a-fA-F0-9]{40,66})|(https?:\/\/(bscscan|etherscan|tronscan|solscan)[^\s]+)/i;
+            const txRegex = /(0x[a-fA-F0-9]{64})|(https?:\/\/(bscscan|etherscan|tronscan|solscan)[^\s]+)/i;
             const amountRegex = /(\b\d+(\.\d+)?\b)\s*(usdt|usd|\$)/i;
             const altAmountRegex = /(amount|total|price|paid|sent)[:\s]*\$?(\d+(\.\d+)?)/i;
 
