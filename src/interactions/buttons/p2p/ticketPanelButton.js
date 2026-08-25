@@ -13,6 +13,29 @@ export const p2pTradeButtonHandler = {
         const kycType = args[1] || 'kyc';
         const isBuy = tradeType === 'buy';
 
+        // Check time restriction (11 PM to 9 AM Kolkata timezone)
+        const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour: 'numeric',
+            hourCycle: 'h23',
+        }).format(new Date());
+        const hour = parseInt(kolkataTimeStr, 10);
+        if (hour >= 23 || hour < 9) {
+            await interaction.reply({
+                content: `⚠️ **We are not doing transactions between 11pm and 9am.**\n*This message will automatically disappear in 5 minutes.*`,
+                flags: MessageFlags.Ephemeral
+            });
+
+            setTimeout(async () => {
+                try {
+                    await interaction.deleteReply();
+                } catch (e) {
+                    // Ignore errors (e.g. if user already dismissed/deleted it or interaction expired)
+                }
+            }, 5 * 60 * 1000);
+            return;
+        }
+
         // 1. Check if user is P2P banned
         const banUntil = await getFromDb(`guild:${interaction.guildId}:p2p:ban_until:${interaction.user.id}`, 0);
         if (banUntil && Date.now() < banUntil) {
