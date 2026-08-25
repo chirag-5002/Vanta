@@ -334,7 +334,6 @@ export async function autoDetectDealFromChannel(channel, guildId) {
     let sellerId = null;
     let usdtAmount = null;
     let txHash = null;
-    let dealInfo = null;
     let isSell = false;
     let userCreatorId = null;
 
@@ -350,6 +349,9 @@ export async function autoDetectDealFromChannel(channel, guildId) {
             if (amountMatch) {
                 usdtAmount = parseFloat(amountMatch[2]);
             }
+        } else {
+            const channelName = channel.name?.toLowerCase() || '';
+            isSell = channelName.includes('sell');
         }
 
         const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
@@ -397,10 +399,6 @@ export async function autoDetectDealFromChannel(channel, guildId) {
                         }
                     }
                 }
-
-                if (!dealInfo && (text.toLowerCase().includes('wallet') || text.toLowerCase().includes('inr') || text.toLowerCase().includes('binance') || text.toLowerCase().includes('p2p') || text.toLowerCase().includes('bank'))) {
-                    dealInfo = text.substring(0, 80).replace(/\n/g, ' ');
-                }
             }
         }
     } catch (err) {
@@ -420,7 +418,7 @@ export async function autoDetectDealFromChannel(channel, guildId) {
         usdtAmount: usdtAmount || minLimit,
         usdAmount: usdtAmount || minLimit,
         txHash: txHash || null,
-        dealInfo: dealInfo || (isSell ? 'Sell USDT Deal' : 'Buy USDT Deal')
+        dealInfo: isSell ? 'SELL USDT DEAL' : 'BUY USDT DEAL'
     };
 }
 
