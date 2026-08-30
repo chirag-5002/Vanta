@@ -631,13 +631,25 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
     let buyerTag = '';
     let sellerTag = '';
     if (guild) {
+        // Try to get from members cache first, then client users cache
         const buyerMember = guild.members.cache.get(deal.buyerId);
         if (buyerMember) {
             buyerTag = ` (${buyerMember.user.username})`;
+        } else {
+            const buyerUser = guild.client?.users?.cache?.get(deal.buyerId);
+            if (buyerUser) {
+                buyerTag = ` (${buyerUser.username})`;
+            }
         }
+        
         const sellerMember = guild.members.cache.get(deal.sellerId);
         if (sellerMember) {
             sellerTag = ` (${sellerMember.user.username})`;
+        } else {
+            const sellerUser = guild.client?.users?.cache?.get(deal.sellerId);
+            if (sellerUser) {
+                sellerTag = ` (${sellerUser.username})`;
+            }
         }
     }
 
@@ -1031,9 +1043,11 @@ export async function sendTransactionDetailsLog(guild, deal) {
         const botId = guild.client?.user?.id;
         if (deal.buyerId && deal.buyerId !== 'server' && deal.buyerId !== botId) {
             await guild.members.fetch(deal.buyerId).catch(() => null);
+            await guild.client.users.fetch(deal.buyerId).catch(() => null);
         }
         if (deal.sellerId && deal.sellerId !== 'server' && deal.sellerId !== botId) {
             await guild.members.fetch(deal.sellerId).catch(() => null);
+            await guild.client.users.fetch(deal.sellerId).catch(() => null);
         }
 
         const embed = buildDealEmbed(deal, config || DEFAULT_P2P_CONFIG, null, guild, true);
