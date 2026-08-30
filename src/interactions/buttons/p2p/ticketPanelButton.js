@@ -13,6 +13,14 @@ export const p2pTradeButtonHandler = {
         const kycType = args[1] || 'kyc';
         const isBuy = tradeType === 'buy';
 
+        const config = await getP2PConfig(interaction.guildId);
+        if (config?.disabled) {
+            return await interaction.reply({
+                content: `❌ **We are not doing any transactions right now. Soon we will operate.**`,
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
         // Check time restriction (11 PM to 9 AM Kolkata timezone)
         const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
             timeZone: 'Asia/Kolkata',

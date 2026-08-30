@@ -284,6 +284,17 @@ export default {
                         .setDescription('The user to reset P2P limits for')
                         .setRequired(true)
                 )
+        )
+        // Subcommand: Toggle USDT Buy/Sell transactions
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('toggle')
+                .setDescription('Toggles whether USDT Buy/Sell transactions (ticket creation) are enabled.')
+                .addBooleanOption(option =>
+                    option.setName('enabled')
+                        .setDescription('Set to True to enable transactions, False to disable.')
+                        .setRequired(true)
+                )
         ),
 
     async execute(interaction, guildConfig, client) {
@@ -321,6 +332,10 @@ export default {
 
         const deferred = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
         if (!deferred) return;
+
+        if (subcommand === 'toggle') {
+            return await handleToggle(interaction);
+        }
 
         if (subcommand === 'setup') {
             return await handleSetup(interaction);
@@ -754,12 +769,14 @@ async function handleSetup(interaction) {
         const vouchChanStr = currentConfig.vouchChannelId ? `<#${currentConfig.vouchChannelId}>` : 'Not Set';
         const staffRoleStr = currentConfig.staffRoleId ? `<@&${currentConfig.staffRoleId}>` : 'None (Admins Only)';
         const minTradeLimit = currentConfig.minTradeAmount !== undefined ? currentConfig.minTradeAmount : 50;
+        const statusStr = currentConfig.disabled ? '🔴 Disabled' : '🟢 Enabled';
 
         return await InteractionHelper.safeEditReply(interaction, {
             embeds: [
                 infoEmbed(
                     'P2P System Configuration',
                     `**Current Settings:**\n` +
+                    `• **Transactions Status:** ${statusStr}\n` +
                     `• **Deal Log Channel:** ${dealChanStr}\n` +
                     `• **Vouch Channel:** ${vouchChanStr}\n` +
                     `• **Staff / Middleman Role:** ${staffRoleStr}\n` +
@@ -1031,6 +1048,37 @@ async function handleReset(interaction) {
                 `• **Daily Tickets Count:** Reset to \`0\`\n` +
                 `• **Timepass Count:** Reset to \`0\`\n` +
                 `• **P2P Ban Status:** Lifted (if active)`
+            )
+        ]
+    });
+}
+
+/**
+ * Toggles USDT transactions active/inactive.
+ */
+async function handleToggle(interaction) {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+        return await replyUserError(interaction, {
+            type: ErrorTypes.PERMISSION,
+            message: 'You need the `Manage Server` permission to toggle P2P transactions.'
+        });
+    }
+
+    const enabled = interaction.options.getBoolean('enabled');
+    const config = await getP2PConfig(interaction.guildId);
+
+    config.disabled = !enabled;
+    await saveP2PConfig(interaction.guildId, config);
+
+    return await InteractionHelper.safeEditReply(interaction, {
+        embeds: [
+            successEmbed(
+                'P2P Transactions Status Updated',
+                `USDT Buy/Sell transactions have been **${enabled ? 'ENABLED' : 'DISABLED'}**.\n\n${
+                    enabled 
+                        ? 'Users can now create buy/sell tickets normally.' 
+                        : 'Users trying to open buy/sell tickets will receive a notice that transactions are currently offline.'
+                }`
             )
         ]
     });

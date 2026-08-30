@@ -30,6 +30,14 @@ export const p2pAmountModalHandler = {
         const isBuy = tradeType === 'buy';
         const isKyc = kycType === 'kyc';
 
+        const config = await getP2PConfig(interaction.guildId);
+        if (config?.disabled) {
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: `❌ **We are not doing any transactions right now. Soon we will operate.**`
+            });
+        }
+
         // Check time restriction (11 PM to 9 AM Kolkata timezone)
         const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
             timeZone: 'Asia/Kolkata',
@@ -142,6 +150,14 @@ export const p2pAmountModalHandler = {
 export const p2pDetailsModalHandler = {
     name: 'p2p_details_modal',
     async execute(interaction, client, args) {
+        const config = await getP2PConfig(interaction.guildId);
+        if (config?.disabled) {
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: `❌ **We are not doing any transactions right now. Soon we will operate.**`
+            });
+        }
+
         // Check time restriction (11 PM to 9 AM Kolkata timezone)
         const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
             timeZone: 'Asia/Kolkata',
