@@ -628,14 +628,27 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
 
     const botId = guild?.client?.user?.id;
 
+    let buyerTag = '';
+    let sellerTag = '';
+    if (guild) {
+        const buyerMember = guild.members.cache.get(deal.buyerId);
+        if (buyerMember) {
+            buyerTag = ` (${buyerMember.user.username})`;
+        }
+        const sellerMember = guild.members.cache.get(deal.sellerId);
+        if (sellerMember) {
+            sellerTag = ` (${sellerMember.user.username})`;
+        }
+    }
+
     // Show bot as mention (e.g. @USDT MarketPlace) and human trader as raw ID in code block or mention
     const botLabel = '@USDT MarketPlace';
     const buyerMention = (deal.buyerId === 'server' || deal.buyerId === botId) 
         ? botLabel 
-        : (revealUsers ? `<@${deal.buyerId}>` : `\`${deal.buyerId}\``);
+        : (revealUsers ? `<@${deal.buyerId}>${buyerTag}` : `\`${deal.buyerId}\``);
     const sellerMention = (deal.sellerId === 'server' || deal.sellerId === botId) 
         ? botLabel 
-        : (revealUsers ? `<@${deal.sellerId}>` : `\`${deal.sellerId}\``);
+        : (revealUsers ? `<@${deal.sellerId}>${sellerTag}` : `\`${deal.sellerId}\``);
 
     const description = [
         `> **Between:** ${buyerMention} and ${sellerMention}`,
@@ -1013,6 +1026,16 @@ export async function sendTransactionDetailsLog(guild, deal) {
         }
 
         const config = await getP2PConfig(guild.id).catch(() => null);
+
+        // Fetch buyer and seller to populate cache so usernames resolve correctly
+        const botId = guild.client?.user?.id;
+        if (deal.buyerId && deal.buyerId !== 'server' && deal.buyerId !== botId) {
+            await guild.members.fetch(deal.buyerId).catch(() => null);
+        }
+        if (deal.sellerId && deal.sellerId !== 'server' && deal.sellerId !== botId) {
+            await guild.members.fetch(deal.sellerId).catch(() => null);
+        }
+
         const embed = buildDealEmbed(deal, config || DEFAULT_P2P_CONFIG, null, guild, true);
 
         await targetChannel.send({
