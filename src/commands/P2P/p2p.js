@@ -690,9 +690,25 @@ async function handleAutoLog(interaction) {
 
     const targetChannel = config.dealChannelId ? interaction.guild.channels.cache.get(config.dealChannelId) : interaction.channel;
 
+    const buyerMember = interaction.guild.members.cache.get(buyerId);
+    let buyerName = buyerMember?.displayName;
+    if (!buyerName) {
+        const buyerUser = interaction.guild.client.users.cache.get(buyerId);
+        buyerName = buyerUser?.displayName || buyerUser?.username || buyerId;
+    }
+
+    const sellerMember = interaction.guild.members.cache.get(sellerId);
+    let sellerName = sellerMember?.displayName;
+    if (!sellerName) {
+        const sellerUser = interaction.guild.client.users.cache.get(sellerId);
+        sellerName = sellerUser?.displayName || sellerUser?.username || sellerId;
+    }
+
     const dealRecord = await logDeal(interaction.guildId, {
         buyerId,
         sellerId,
+        buyerName,
+        sellerName,
         usdtAmount: detected.usdtAmount,
         usdAmount: detected.usdAmount,
         txHash: detected.txHash,
@@ -864,9 +880,16 @@ async function handleDeal(interaction) {
         });
     }
 
+    const buyerMember = interaction.guild.members.cache.get(buyer.id);
+    const sellerMember = interaction.guild.members.cache.get(seller.id);
+    const buyerName = buyerMember?.displayName || buyer.displayName || buyer.username;
+    const sellerName = sellerMember?.displayName || seller.displayName || seller.username;
+
     const dealRecord = await logDeal(interaction.guildId, {
         buyerId: buyer.id,
         sellerId: seller.id,
+        buyerName,
+        sellerName,
         usdtAmount,
         usdAmount,
         txHash,

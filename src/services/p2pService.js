@@ -486,9 +486,26 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
     const botId = channel.client.user.id;
     const buyerId = detected.buyerId;
     const sellerId = detected.sellerId;
+
+    const buyerMember = channel.guild.members.cache.get(buyerId);
+    let buyerName = buyerMember?.displayName;
+    if (!buyerName) {
+        const buyerUser = channel.guild.client.users.cache.get(buyerId);
+        buyerName = buyerUser?.displayName || buyerUser?.username || buyerId;
+    }
+
+    const sellerMember = channel.guild.members.cache.get(sellerId);
+    let sellerName = sellerMember?.displayName;
+    if (!sellerName) {
+        const sellerUser = channel.guild.client.users.cache.get(sellerId);
+        sellerName = sellerUser?.displayName || sellerUser?.username || sellerId;
+    }
+
     const dealRecord = await logDeal(guildId, {
         buyerId,
         sellerId,
+        buyerName,
+        sellerName,
         usdtAmount: detected.usdtAmount,
         usdAmount: detected.usdAmount,
         txHash: detected.txHash,
@@ -636,23 +653,30 @@ export function buildDealEmbed(deal, config = DEFAULT_P2P_CONFIG, formattedDate 
         // Try to get from members cache first, then client users cache
         const buyerMember = guild.members.cache.get(deal.buyerId);
         if (buyerMember) {
-            buyerTag = ` (${buyerMember.user.username})`;
+            buyerTag = ` (${buyerMember.displayName})`;
         } else {
             const buyerUser = guild.client?.users?.cache?.get(deal.buyerId);
             if (buyerUser) {
-                buyerTag = ` (${buyerUser.username})`;
+                buyerTag = ` (${buyerUser.displayName || buyerUser.username})`;
+            } else if (deal.buyerName) {
+                buyerTag = ` (${deal.buyerName})`;
             }
         }
         
         const sellerMember = guild.members.cache.get(deal.sellerId);
         if (sellerMember) {
-            sellerTag = ` (${sellerMember.user.username})`;
+            sellerTag = ` (${sellerMember.displayName})`;
         } else {
             const sellerUser = guild.client?.users?.cache?.get(deal.sellerId);
             if (sellerUser) {
-                sellerTag = ` (${sellerUser.username})`;
+                sellerTag = ` (${sellerUser.displayName || sellerUser.username})`;
+            } else if (deal.sellerName) {
+                sellerTag = ` (${deal.sellerName})`;
             }
         }
+    } else {
+        if (deal.buyerName) buyerTag = ` (${deal.buyerName})`;
+        if (deal.sellerName) sellerTag = ` (${deal.sellerName})`;
     }
 
     // Show bot as mention (e.g. @USDT MarketPlace) and human trader as raw ID in code block or mention
@@ -820,6 +844,8 @@ export async function logDeal(guildId, dealData, botId = null) {
         guildId,
         buyerId: dealData.buyerId,
         sellerId: dealData.sellerId,
+        buyerName: dealData.buyerName || null,
+        sellerName: dealData.sellerName || null,
         usdtAmount: dealData.usdtAmount,
         usdAmount: dealData.usdAmount || dealData.usdtAmount,
         txHash: dealData.txHash || null,
