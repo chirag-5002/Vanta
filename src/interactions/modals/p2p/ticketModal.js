@@ -113,7 +113,6 @@ export const p2pAmountModalHandler = {
             });
         }
 
-        const config = await getP2PConfig(interaction.guildId);
         const minLimit = config?.minTradeAmount !== undefined ? config.minTradeAmount : 50;
 
         if (amountVal < minLimit) {
@@ -222,7 +221,6 @@ export const p2pDetailsModalHandler = {
             const key = `${interaction.guildId}:${interaction.user.id}`;
             const selections = wizardSelections.get(key) || {};
 
-            const config = await getP2PConfig(interaction.guildId);
             const minLimit = config?.minTradeAmount !== undefined ? config.minTradeAmount : 50;
 
             const amountDisplay = selections.amount || minLimit.toString();

@@ -121,7 +121,6 @@ export const p2pTradeButtonHandler = {
         const key = `${interaction.guildId}:${interaction.user.id}`;
         wizardSelections.delete(key);
 
-        const config = await getP2PConfig(interaction.guildId);
         const minLimit = config?.minTradeAmount !== undefined ? config.minTradeAmount : 50;
 
         const modal = new ModalBuilder()
