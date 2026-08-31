@@ -12,6 +12,8 @@ export const DEFAULT_P2P_CONFIG = {
     embedColor: '#FFC107', // Amber/Yellow matching reference design
     minTradeAmount: 50,
     disabled: false,
+    buyDisabled: false,
+    sellDisabled: false,
 };
 
 export const DEFAULT_PAYMENT_CONFIG = {

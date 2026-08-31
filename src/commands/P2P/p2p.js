@@ -290,6 +290,16 @@ export default {
             subcommand
                 .setName('toggle')
                 .setDescription('Toggles whether USDT Buy/Sell transactions (ticket creation) are enabled.')
+                .addStringOption(option =>
+                    option.setName('type')
+                        .setDescription('Select what to toggle (buy, sell, or both)')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'Buy Transactions', value: 'buy' },
+                            { name: 'Sell Transactions', value: 'sell' },
+                            { name: 'Both (Global)', value: 'both' }
+                        )
+                )
                 .addBooleanOption(option =>
                     option.setName('enabled')
                         .setDescription('Set to True to enable transactions, False to disable.')
@@ -769,7 +779,14 @@ async function handleSetup(interaction) {
         const vouchChanStr = currentConfig.vouchChannelId ? `<#${currentConfig.vouchChannelId}>` : 'Not Set';
         const staffRoleStr = currentConfig.staffRoleId ? `<@&${currentConfig.staffRoleId}>` : 'None (Admins Only)';
         const minTradeLimit = currentConfig.minTradeAmount !== undefined ? currentConfig.minTradeAmount : 50;
-        const statusStr = currentConfig.disabled ? '🔴 Disabled' : '🟢 Enabled';
+        let statusStr = '';
+        if (currentConfig.disabled) {
+            statusStr = '🔴 Disabled (Global)';
+        } else {
+            const buyStatus = currentConfig.buyDisabled ? '🔴 Buy: Disabled' : '🟢 Buy: Enabled';
+            const sellStatus = currentConfig.sellDisabled ? '🔴 Sell: Disabled' : '🟢 Sell: Enabled';
+            statusStr = `${buyStatus} | ${sellStatus}`;
+        }
 
         return await InteractionHelper.safeEditReply(interaction, {
             embeds: [
@@ -1065,19 +1082,35 @@ async function handleToggle(interaction) {
     }
 
     const enabled = interaction.options.getBoolean('enabled');
+    const type = interaction.options.getString('type');
     const config = await getP2PConfig(interaction.guildId);
 
-    config.disabled = !enabled;
+    let statusText = '';
+    if (type === 'buy') {
+        config.buyDisabled = !enabled;
+        if (enabled) config.disabled = false;
+        statusText = `USDT **Buy** transactions have been **${enabled ? 'ENABLED' : 'DISABLED'}**.`;
+    } else if (type === 'sell') {
+        config.sellDisabled = !enabled;
+        if (enabled) config.disabled = false;
+        statusText = `USDT **Sell** transactions have been **${enabled ? 'ENABLED' : 'DISABLED'}**.`;
+    } else { // both
+        config.disabled = !enabled;
+        config.buyDisabled = !enabled;
+        config.sellDisabled = !enabled;
+        statusText = `USDT **Buy & Sell** transactions have been **${enabled ? 'ENABLED' : 'DISABLED'}** globally.`;
+    }
+
     await saveP2PConfig(interaction.guildId, config);
 
     return await InteractionHelper.safeEditReply(interaction, {
         embeds: [
             successEmbed(
                 'P2P Transactions Status Updated',
-                `USDT Buy/Sell transactions have been **${enabled ? 'ENABLED' : 'DISABLED'}**.\n\n${
+                `${statusText}\n\n${
                     enabled 
-                        ? 'Users can now create buy/sell tickets normally.' 
-                        : 'Users trying to open buy/sell tickets will receive a notice that transactions are currently offline.'
+                        ? 'Users can now create tickets for enabled categories normally.' 
+                        : 'Users trying to open tickets for disabled categories will receive a notice that transactions are offline.'
                 }`
             )
         ]

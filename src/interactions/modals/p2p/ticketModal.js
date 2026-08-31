@@ -38,6 +38,20 @@ export const p2pAmountModalHandler = {
             });
         }
 
+        if (isBuy && config?.buyDisabled) {
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: `❌ **Buy transactions are currently offline. Soon we will operate.**`
+            });
+        }
+
+        if (!isBuy && config?.sellDisabled) {
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: `❌ **Sell transactions are currently offline. Soon we will operate.**`
+            });
+        }
+
         // Check time restriction (11 PM to 9 AM Kolkata timezone)
         const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
             timeZone: 'Asia/Kolkata',
@@ -150,11 +164,28 @@ export const p2pAmountModalHandler = {
 export const p2pDetailsModalHandler = {
     name: 'p2p_details_modal',
     async execute(interaction, client, args) {
+        const tradeType = args[0] || 'buy';
+        const isBuy = tradeType === 'buy';
+
         const config = await getP2PConfig(interaction.guildId);
         if (config?.disabled) {
             return await replyUserError(interaction, {
                 type: ErrorTypes.VALIDATION,
                 message: `❌ **We are not doing any transactions right now. Soon we will operate.**`
+            });
+        }
+
+        if (isBuy && config?.buyDisabled) {
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: `❌ **Buy transactions are currently offline. Soon we will operate.**`
+            });
+        }
+
+        if (!isBuy && config?.sellDisabled) {
+            return await replyUserError(interaction, {
+                type: ErrorTypes.VALIDATION,
+                message: `❌ **Sell transactions are currently offline. Soon we will operate.**`
             });
         }
 
@@ -184,9 +215,7 @@ export const p2pDetailsModalHandler = {
         await interaction.deferUpdate().catch(() => null);
 
         try {
-            const tradeType = args[0] || 'buy';
             const kycType = args[1] || 'kyc';
-            const isBuy = tradeType === 'buy';
             const isKyc = kycType === 'kyc';
 
             // Get stored wizard selections

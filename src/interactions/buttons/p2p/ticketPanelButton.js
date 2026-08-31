@@ -21,6 +21,20 @@ export const p2pTradeButtonHandler = {
             });
         }
 
+        if (isBuy && config?.buyDisabled) {
+            return await interaction.reply({
+                content: `❌ **Buy transactions are currently offline. Soon we will operate.**`,
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        if (!isBuy && config?.sellDisabled) {
+            return await interaction.reply({
+                content: `❌ **Sell transactions are currently offline. Soon we will operate.**`,
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
         // Check time restriction (11 PM to 9 AM Kolkata timezone)
         const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
             timeZone: 'Asia/Kolkata',
