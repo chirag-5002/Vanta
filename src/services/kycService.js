@@ -202,16 +202,12 @@ export async function startKycVerificationFlow(interaction, client) {
             `1️⃣ **ID Card Photo** (Front & Back — Aadhaar, PAN, or Passport)\n` +
             `2️⃣ **Selfie** holding your ID Card\n\n` +
             `**Instructions:**\n` +
-            `• Refer to the step-by-step verification guide below.\n` +
+            `• Refer to the visual verification guide below.\n` +
             `• Drag & drop or upload both image files directly in this channel.\n` +
             `• Once both files are visible in the chat, click **Submit Verification** below.`
         )
         .setColor('#FFC107')
         .setFooter({ text: `${guild.name} • KYC Verification System` });
-
-    if (hasGuideImage) {
-        welcomeEmbed.setImage('attachment://kyc_guide.jpg');
-    }
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -224,17 +220,19 @@ export async function startKycVerificationFlow(interaction, client) {
             .setStyle(ButtonStyle.Danger)
     );
 
-    const messagePayload = {
+    // 1. Send welcome embed with buttons
+    await channel.send({
         content: `<@${userId}>`,
         embeds: [welcomeEmbed],
         components: [row]
-    };
+    });
 
+    // 2. Send visual guide image as a separate message right below for full clarity
     if (hasGuideImage) {
-        messagePayload.files = [new AttachmentBuilder(KYC_GUIDE_IMAGE_PATH, { name: 'kyc_guide.jpg' })];
+        await channel.send({
+            files: [new AttachmentBuilder(KYC_GUIDE_IMAGE_PATH, { name: 'kyc_guide.jpg' })]
+        }).catch(() => null);
     }
-
-    await channel.send(messagePayload);
 
     const successMessage = `✅ Your KYC Verification ticket has been created: <#${channel.id}>`;
     if (isDeferredOrReplied) {
@@ -829,14 +827,19 @@ export async function autoDeployKycPanel(guild) {
             );
         }
 
-        if (!targetChannel) return;
-
+        const hasGuideImage = existsSync(KYC_GUIDE_IMAGE_PATH);
         const msgs = await targetChannel.messages.fetch({ limit: 15 }).catch(() => null);
-        const botHasNewPanel = msgs && msgs.some(m =>
+        const hasPanelEmbed = msgs && msgs.some(m =>
             m.author.id === guild.client.user.id &&
             m.components.some(row => row.components.some(b => b.customId === 'kyc_start_verification')) &&
             m.embeds.some(e => e.title?.includes('KYC Verification'))
         );
+        const hasGuideImg = msgs && msgs.some(m =>
+            m.author.id === guild.client.user.id &&
+            m.attachments.some(a => a.name?.includes('kyc_guide'))
+        );
+
+        const botHasNewPanel = hasPanelEmbed && (hasGuideImg || !hasGuideImage);
 
         if (!botHasNewPanel) {
             if (msgs) {
@@ -845,8 +848,6 @@ export async function autoDeployKycPanel(guild) {
                     await m.delete().catch(() => null);
                 }
             }
-
-            const hasGuideImage = existsSync(KYC_GUIDE_IMAGE_PATH);
 
             const embed = new EmbedBuilder()
                 .setTitle('🔒 ICN KYC Verification Guide & Portal')
@@ -866,10 +867,6 @@ export async function autoDeployKycPanel(guild) {
                 .setColor('#FFC107')
                 .setFooter({ text: `${guild.name} • Official KYC Verification` });
 
-            if (hasGuideImage) {
-                embed.setImage('attachment://kyc_guide.jpg');
-            }
-
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId('kyc_start_verification')
@@ -877,16 +874,18 @@ export async function autoDeployKycPanel(guild) {
                     .setStyle(ButtonStyle.Success)
             );
 
-            const sendPayload = {
+            // 1. Send panel embed with button
+            await targetChannel.send({
                 embeds: [embed],
                 components: [row]
-            };
+            }).catch(() => null);
 
+            // 2. Send visual guide photo as separate message below
             if (hasGuideImage) {
-                sendPayload.files = [new AttachmentBuilder(KYC_GUIDE_IMAGE_PATH, { name: 'kyc_guide.jpg' })];
+                await targetChannel.send({
+                    files: [new AttachmentBuilder(KYC_GUIDE_IMAGE_PATH, { name: 'kyc_guide.jpg' })]
+                }).catch(() => null);
             }
-
-            await targetChannel.send(sendPayload).catch(() => null);
         }
     } catch (err) {
         logger.error('Error auto-deploying KYC panel:', err);

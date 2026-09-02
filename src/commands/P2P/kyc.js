@@ -297,10 +297,6 @@ async function handlePanel(interaction) {
         .setColor('#FFC107')
         .setFooter({ text: `${interaction.guild.name} • Official KYC Verification` });
 
-    if (hasGuideImage) {
-        embed.setImage('attachment://kyc_guide.jpg');
-    }
-
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('kyc_start_verification')
@@ -308,12 +304,15 @@ async function handlePanel(interaction) {
             .setStyle(ButtonStyle.Success)
     );
 
-    const sendPayload = { embeds: [embed], components: [row] };
-    if (hasGuideImage) {
-        sendPayload.files = [new AttachmentBuilder(KYC_GUIDE_IMAGE_PATH, { name: 'kyc_guide.jpg' })];
-    }
+    // 1. Send panel embed with button
+    await targetChannel.send({ embeds: [embed], components: [row] });
 
-    await targetChannel.send(sendPayload);
+    // 2. Send visual guide photo as separate message below
+    if (hasGuideImage) {
+        await targetChannel.send({
+            files: [new AttachmentBuilder(KYC_GUIDE_IMAGE_PATH, { name: 'kyc_guide.jpg' })]
+        }).catch(() => null);
+    }
 
     return await InteractionHelper.safeEditReply(interaction, {
         content: `✅ Posted KYC verification panel in <#${targetChannel.id}>.`
