@@ -100,12 +100,12 @@ graph TD
 ### 🔒 KYC Commands (`Manage Server` / `Staff` only)
 
 * **`/kyc setup`** (Admins Only)
-  * **Options:** `role` (role granted to verified users), `log_channel` (where KYC reviews are logged).
+  * **Options:** `verified_role`, `panel_channel` (channel for KYC guide portal), `review_category`, `log_channel`.
   * **Purpose:** Saves verification configuration to the database.
 
 * **`/kyc panel`** (Admins Only)
-  * **Channel:** `#kyc-verification`.
-  * **Purpose:** Sends the official static KYC portal welcome embed with the **`🔒 Start KYC Verification`** button.
+  * **Channel:** `#verify-yourself` or `#kyc-verification` (or auto-deployed automatically).
+  * **Purpose:** Sends the official KYC portal welcome embed accompanied by the visual **KYC Verification Guide** image and the **`🔒 Start KYC Verification`** button.
 
 * **`/kyc approve`** & **`/kyc reject`** (Staff Only)
   * **Options:** `user` (user to review), `reason` (rejection reason).

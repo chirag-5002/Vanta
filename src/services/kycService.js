@@ -1,7 +1,11 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, MessageFlags } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, MessageFlags, AttachmentBuilder } from 'discord.js';
+import { join } from 'path';
+import { existsSync } from 'fs';
 import { getFromDb, setInDb, saveTicketData } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
 import { getP2PConfig } from './p2pService.js';
+
+export const KYC_GUIDE_IMAGE_PATH = join(process.cwd(), 'src/assets/kyc_guide.jpg');
 
 function generateRandomId(length = 7) {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -13,9 +17,10 @@ function generateRandomId(length = 7) {
 }
 
 export const DEFAULT_KYC_CONFIG = {
-    roleId: null,      // Role given to verified users
-    categoryId: null,  // Category for KYC tickets
+    roleId: null,       // Role given to verified users
+    categoryId: null,   // Category for KYC tickets
     logChannelId: null, // Log channel for KYC decisions
+    channelId: null,    // Dedicated channel for KYC verification panel
 };
 
 export const getKycConfigKey = (guildId) => `guild:${guildId}:kyc:config`;
@@ -188,18 +193,25 @@ export async function startKycVerificationFlow(interaction, client) {
     await saveTicketData(guild.id, channel.id, ticketData);
 
     // Send welcome instructions
+    const hasGuideImage = existsSync(KYC_GUIDE_IMAGE_PATH);
+
     const welcomeEmbed = new EmbedBuilder()
         .setTitle('🔒 KYC Verification Portal')
         .setDescription(
             `Welcome <@${userId}>! To verify your identity and unlock KYC trading, please upload:\n\n` +
-            `1️⃣ **ID Card Photo** (Front & Back)\n` +
-            `2️⃣ **Selfie** of you holding that ID Card\n\n` +
+            `1️⃣ **ID Card Photo** (Front & Back — Aadhaar, PAN, or Passport)\n` +
+            `2️⃣ **Selfie** holding your ID Card\n\n` +
             `**Instructions:**\n` +
+            `• Refer to the step-by-step verification guide below.\n` +
             `• Drag & drop or upload both image files directly in this channel.\n` +
             `• Once both files are visible in the chat, click **Submit Verification** below.`
         )
         .setColor('#FFC107')
         .setFooter({ text: `${guild.name} • KYC Verification System` });
+
+    if (hasGuideImage) {
+        welcomeEmbed.setImage('attachment://kyc_guide.jpg');
+    }
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -212,11 +224,17 @@ export async function startKycVerificationFlow(interaction, client) {
             .setStyle(ButtonStyle.Danger)
     );
 
-    await channel.send({
+    const messagePayload = {
         content: `<@${userId}>`,
         embeds: [welcomeEmbed],
         components: [row]
-    });
+    };
+
+    if (hasGuideImage) {
+        messagePayload.files = [new AttachmentBuilder(KYC_GUIDE_IMAGE_PATH, { name: 'kyc_guide.jpg' })];
+    }
+
+    await channel.send(messagePayload);
 
     const successMessage = `✅ Your KYC Verification ticket has been created: <#${channel.id}>`;
     if (isDeferredOrReplied) {
@@ -777,3 +795,101 @@ export async function cleanupIdleKycTickets(client) {
         logger.error('Error in cleanupIdleKycTickets:', err);
     }
 }
+
+/**
+ * Auto-deploys the KYC Verification guide panel inside #verify-yourself or #kyc-verification channel.
+ */
+export async function autoDeployKycPanel(guild) {
+    if (!guild || !guild.channels) return;
+    try {
+        const channels = await guild.channels.fetch().catch(() => null);
+        if (!channels) return;
+
+        const kycConfig = await getKycConfig(guild.id).catch(() => ({}));
+
+        let targetChannel = null;
+        if (kycConfig.channelId) {
+            targetChannel = channels.get(kycConfig.channelId);
+        }
+
+        if (!targetChannel) {
+            targetChannel = channels.find(c =>
+                c && c.isTextBased() && (
+                    c.name.includes('verify-yourself') ||
+                    c.name.includes('kyc-verification') ||
+                    c.name.includes('kyc-verify') ||
+                    c.name.includes('id-verification') ||
+                    c.name === 'kyc' ||
+                    c.name === 'verify'
+                ) &&
+                !c.name.includes('log') &&
+                !c.name.includes('ticket') &&
+                !c.name.startsWith('🔒-kyc-') &&
+                !c.name.startsWith('kyc-')
+            );
+        }
+
+        if (!targetChannel) return;
+
+        const msgs = await targetChannel.messages.fetch({ limit: 15 }).catch(() => null);
+        const botHasNewPanel = msgs && msgs.some(m =>
+            m.author.id === guild.client.user.id &&
+            m.components.some(row => row.components.some(b => b.customId === 'kyc_start_verification')) &&
+            m.embeds.some(e => e.title?.includes('KYC Verification'))
+        );
+
+        if (!botHasNewPanel) {
+            if (msgs) {
+                const oldPanels = msgs.filter(m => m.author.id === guild.client.user.id);
+                for (const m of oldPanels.values()) {
+                    await m.delete().catch(() => null);
+                }
+            }
+
+            const hasGuideImage = existsSync(KYC_GUIDE_IMAGE_PATH);
+
+            const embed = new EmbedBuilder()
+                .setTitle('🔒 ICN KYC Verification Guide & Portal')
+                .setDescription(
+                    `Welcome to the **${guild.name}** KYC Verification Portal!\n\n` +
+                    `Verify your identity to unlock verified P2P trading, higher trade limits, and fast safe transactions.\n\n` +
+                    `📋 **Accepted ID Proofs:**\n` +
+                    `• **Aadhaar Card** (Front & Back)\n` +
+                    `• **PAN Card** (Front & Back)\n` +
+                    `• **Passport** (Front & Back)\n\n` +
+                    `📸 **Required Steps:**\n` +
+                    `1️⃣ Upload clear photo of your ID document\n` +
+                    `2️⃣ Upload clear selfie holding that ID card\n` +
+                    `3️⃣ Click submit for fast staff review\n\n` +
+                    `Click **Start KYC Verification** below to open your private ticket.`
+                )
+                .setColor('#FFC107')
+                .setFooter({ text: `${guild.name} • Official KYC Verification` });
+
+            if (hasGuideImage) {
+                embed.setImage('attachment://kyc_guide.jpg');
+            }
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('kyc_start_verification')
+                    .setLabel('🔒 Start KYC Verification')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+            const sendPayload = {
+                embeds: [embed],
+                components: [row]
+            };
+
+            if (hasGuideImage) {
+                sendPayload.files = [new AttachmentBuilder(KYC_GUIDE_IMAGE_PATH, { name: 'kyc_guide.jpg' })];
+            }
+
+            await targetChannel.send(sendPayload).catch(() => null);
+        }
+    } catch (err) {
+        logger.error('Error auto-deploying KYC panel:', err);
+    }
+}
+

@@ -199,6 +199,26 @@ export default {
         }
       }
 
+      // Immediately clean user clutter in verify-yourself / kyc-verification channel
+      const isKycPortal = (channelName.includes('verify-yourself') || 
+                          channelName.includes('kyc-verification') || 
+                          channelName.includes('kyc-verify') ||
+                          channelName.includes('id-verification')) &&
+                          !channelName.includes('log') &&
+                          !channelName.includes('ticket') &&
+                          !channelName.startsWith('🔒-kyc-') &&
+                          !channelName.startsWith('kyc-');
+      if (isKycPortal) {
+        const isAdmin = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
+                        message.member?.permissions.has(PermissionFlagsBits.ManageGuild);
+        if (!isAdmin) {
+          await message.delete().catch(() => null);
+          const { autoDeployKycPanel } = await import('../services/kycService.js');
+          await autoDeployKycPanel(message.guild).catch(() => null);
+          return;
+        }
+      }
+
       logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
       const countingProcessed = await handleCountingGame(message, client);

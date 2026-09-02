@@ -1,5 +1,6 @@
-import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getKycConfig, saveKycConfig, getKycStatus, startKycVerificationFlow, approveKyc, rejectKyc } from '../../services/kycService.js';
+import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } from 'discord.js';
+import { existsSync } from 'fs';
+import { getKycConfig, saveKycConfig, getKycStatus, startKycVerificationFlow, approveKyc, rejectKyc, KYC_GUIDE_IMAGE_PATH } from '../../services/kycService.js';
 import { successEmbed, infoEmbed, errorEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
@@ -19,6 +20,12 @@ export default {
                 .addRoleOption(option =>
                     option.setName('verified_role')
                         .setDescription('Role given to users after KYC approval')
+                        .setRequired(false)
+                )
+                .addChannelOption(option =>
+                    option.setName('panel_channel')
+                        .setDescription('Channel where KYC verification guide panel is posted')
+                        .addChannelTypes(ChannelType.GuildText)
                         .setRequired(false)
                 )
                 .addChannelOption(option =>
@@ -158,17 +165,20 @@ export default {
 
 async function handleSetup(interaction) {
     const verifiedRole = interaction.options.getRole('verified_role');
+    const panelChannel = interaction.options.getChannel('panel_channel');
     const reviewCategory = interaction.options.getChannel('review_category');
     const logChannel = interaction.options.getChannel('log_channel');
 
     const updateObj = {};
     if (verifiedRole) updateObj.roleId = verifiedRole.id;
+    if (panelChannel) updateObj.channelId = panelChannel.id;
     if (reviewCategory) updateObj.categoryId = reviewCategory.id;
     if (logChannel) updateObj.logChannelId = logChannel.id;
 
     if (Object.keys(updateObj).length === 0) {
         const currentConfig = await getKycConfig(interaction.guildId);
         const roleStr = currentConfig.roleId ? `<@&${currentConfig.roleId}>` : 'Not Set';
+        const panelChanStr = currentConfig.channelId ? `<#${currentConfig.channelId}>` : 'Not Set (Auto detect #verify-yourself / #kyc-verification)';
         const categoryStr = currentConfig.categoryId ? `<#${currentConfig.categoryId}>` : 'Not Set (Auto detect)';
         const logStr = currentConfig.logChannelId ? `<#${currentConfig.logChannelId}>` : 'Not Set';
 
@@ -178,6 +188,7 @@ async function handleSetup(interaction) {
                     'KYC System Configuration',
                     `**Current Settings:**\n` +
                     `• **KYC Verified Role:** ${roleStr}\n` +
+                    `• **KYC Panel Channel:** ${panelChanStr}\n` +
                     `• **KYC Review Category:** ${categoryStr}\n` +
                     `• **KYC Activity Log:** ${logStr}\n\n` +
                     `Use options in \`/kyc setup\` to update these settings.`
@@ -190,6 +201,7 @@ async function handleSetup(interaction) {
 
     const changes = [];
     if (verifiedRole) changes.push(`• **KYC Verified Role:** <@&${verifiedRole.id}>`);
+    if (panelChannel) changes.push(`• **KYC Panel Channel:** <#${panelChannel.id}>`);
     if (reviewCategory) changes.push(`• **Review Category:** <#${reviewCategory.id}>`);
     if (logChannel) changes.push(`• **Activity Log Channel:** <#${logChannel.id}>`);
 
@@ -263,28 +275,45 @@ async function handleReject(interaction, client) {
 
 async function handlePanel(interaction) {
     const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
-    const customTitle = interaction.options.getString('title') || '🔒 KYC Verification Required';
+    const customTitle = interaction.options.getString('title') || '🔒 ICN KYC Verification Guide & Portal';
     const customDesc = interaction.options.getString('description') || 
-        'To trade with KYC, buy with higher limits, or sell safely on this server, you must complete identity verification.\n\n' +
-        '**Required Documents:**\n' +
-        '1️⃣ Photo ID Document (Front & Back)\n' +
-        '2️⃣ Selfie holding that Photo ID\n\n' +
-        'Click the button below to open a private verification ticket.';
+        'Welcome to the KYC Verification Portal!\n\n' +
+        'To unlock verified trading, buy with higher limits, or sell safely on this server, please complete your identity verification.\n\n' +
+        '📋 **Accepted ID Proofs:**\n' +
+        '• **Aadhaar Card** (Front & Back)\n' +
+        '• **PAN Card** (Front & Back)\n' +
+        '• **Passport** (Front & Back)\n\n' +
+        '📸 **Required Steps:**\n' +
+        '1️⃣ Upload clear photo of your ID document\n' +
+        '2️⃣ Upload clear selfie holding that ID card\n' +
+        '3️⃣ Click submit for fast staff review\n\n' +
+        'Click **Start KYC Verification** below to open your private ticket.';
+
+    const hasGuideImage = existsSync(KYC_GUIDE_IMAGE_PATH);
 
     const embed = new EmbedBuilder()
         .setTitle(customTitle)
         .setDescription(customDesc)
         .setColor('#FFC107')
-        .setFooter({ text: `${interaction.guild.name} • KYC Portal` });
+        .setFooter({ text: `${interaction.guild.name} • Official KYC Verification` });
+
+    if (hasGuideImage) {
+        embed.setImage('attachment://kyc_guide.jpg');
+    }
 
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('kyc_start_verification')
-            .setLabel('🔒 Start Verification')
+            .setLabel('🔒 Start KYC Verification')
             .setStyle(ButtonStyle.Success)
     );
 
-    await targetChannel.send({ embeds: [embed], components: [row] });
+    const sendPayload = { embeds: [embed], components: [row] };
+    if (hasGuideImage) {
+        sendPayload.files = [new AttachmentBuilder(KYC_GUIDE_IMAGE_PATH, { name: 'kyc_guide.jpg' })];
+    }
+
+    await targetChannel.send(sendPayload);
 
     return await InteractionHelper.safeEditReply(interaction, {
         content: `✅ Posted KYC verification panel in <#${targetChannel.id}>.`

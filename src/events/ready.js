@@ -76,6 +76,17 @@ export default {
         logger.error("Error auto-deploying report panels on startup:", err);
       }
 
+      // Auto-deploy KYC panel in #verify-yourself / #kyc-verification
+      try {
+        const { autoDeployKycPanel } = await import("../services/kycService.js");
+        for (const guild of client.guilds.cache.values()) {
+          await autoDeployKycPanel(guild).catch(() => null);
+        }
+        startupLog("KYC panel auto-deployment completed");
+      } catch (err) {
+        logger.error("Error auto-deploying KYC panels on startup:", err);
+      }
+
       // Pre-download and register Poppins fonts for welcome cards
       try {
         const { ensureFonts } = await import("../utils/welcomeCard.js");
