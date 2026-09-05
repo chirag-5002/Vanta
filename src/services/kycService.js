@@ -827,6 +827,10 @@ export async function autoDeployKycPanel(guild) {
             );
         }
 
+        if (!targetChannel) {
+            return;
+        }
+
         const hasGuideImage = existsSync(KYC_GUIDE_IMAGE_PATH);
         const msgs = await targetChannel.messages.fetch({ limit: 15 }).catch(() => null);
         const hasPanelEmbed = msgs && msgs.some(m =>
