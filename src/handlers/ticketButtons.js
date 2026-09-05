@@ -471,6 +471,110 @@ const deleteTicketHandler = {
   }
 };
 
+const flagScamButtonHandler = {
+  name: 'ticket_flag_scam',
+  async execute(interaction, client) {
+    try {
+      if (!(await ensureGuildContext(interaction))) return;
+
+      await assertTicketPermission(interaction, client, 'flag tickets as scam', {}, 2000);
+
+      const modal = new ModalBuilder()
+        .setCustomId('ticket_scam_modal')
+        .setTitle('🚨 Flag Ticket as Scam');
+
+      const reasonInput = new TextInputBuilder()
+        .setCustomId('scam_reason')
+        .setLabel('Why is this ticket a scam?')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('e.g. Fake payment receipt, fake tx hash, refused payment...')
+        .setRequired(true)
+        .setMaxLength(1000);
+
+      const notesInput = new TextInputBuilder()
+        .setCustomId('scam_notes')
+        .setLabel('Additional remarks / Staff notes (optional)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Any extra details or scammer tactics...')
+        .setRequired(false)
+        .setMaxLength(1000);
+
+      const row1 = new ActionRowBuilder().addComponents(reasonInput);
+      const row2 = new ActionRowBuilder().addComponents(notesInput);
+      modal.addComponents(row1, row2);
+
+      await interaction.showModal(modal);
+    } catch (error) {
+      logger.error('Error opening scam modal:', error);
+      if (!interaction.replied && !interaction.deferred) {
+        await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'Could not open scam report form.' });
+      }
+    }
+  }
+};
+
+const flagScamModalHandler = {
+  name: 'ticket_scam_modal',
+  async execute(interaction, client) {
+    try {
+      if (!(await ensureGuildContext(interaction))) return;
+
+      await assertTicketPermission(interaction, client, 'flag tickets as scam', {}, 2000);
+
+      const deferSuccess = await InteractionHelper.safeDefer(interaction, { flags: MessageFlags.Ephemeral });
+      if (!deferSuccess) return;
+
+      const reason = interaction.fields.getTextInputValue('scam_reason')?.trim() || 'Scam Attempt';
+      const notes = interaction.fields.getTextInputValue('scam_notes')?.trim() || '';
+
+      const { logScamTicket } = await import('../services/scamTicketService.js');
+      const { deleteTicket } = await import('../services/ticket.js');
+
+      const success = await logScamTicket(interaction.channel, interaction.member || interaction.user, { reason, notes });
+
+      if (success) {
+        await interaction.editReply({
+          embeds: [createEmbed({
+            title: '🚨 Scam Evidence Logged',
+            description: `Full chat transcript, photos, and scammer details have been permanently archived in **#scam-tickets**.\n\n🗑️ This ticket channel will be deleted in **5 seconds**...`,
+            color: 0xE74C3C,
+          })],
+        });
+
+        const channel = interaction.channel;
+        const deleter = interaction.member || interaction.user;
+
+        setTimeout(async () => {
+          try {
+            const freshChannel = channel.guild.channels.cache.get(channel.id) ||
+                                await channel.guild.channels.fetch(channel.id).catch(() => null);
+            if (freshChannel) {
+              await deleteTicket(freshChannel, deleter).catch(() => null);
+            }
+          } catch (delErr) {
+            logger.error('Error auto-deleting scam ticket:', delErr);
+          }
+        }, 5000);
+      } else {
+        await interaction.editReply({
+          embeds: [createEmbed({
+            title: '⚠️ Logging Issue',
+            description: 'Could not fully archive scam evidence. Please make sure `#scam-tickets` channel is accessible.',
+            color: 0xE67E22,
+          })],
+        });
+      }
+    } catch (error) {
+      logger.error('Error submitting scam modal:', error);
+      if (!interaction.replied && !interaction.deferred) {
+        await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'An error occurred while logging the scam ticket.' });
+      } else if (interaction.deferred) {
+        await replyUserError(interaction, { type: ErrorTypes.UNKNOWN, message: 'An error occurred while logging the scam ticket.' });
+      }
+    }
+  }
+};
+
 export default createTicketHandler;
 export { 
   createTicketModalHandler, 
@@ -481,5 +585,7 @@ export {
   pinTicketHandler,
   unclaimTicketHandler,
   reopenTicketHandler,
-  deleteTicketHandler 
+  deleteTicketHandler,
+  flagScamButtonHandler,
+  flagScamModalHandler
 };

@@ -460,7 +460,12 @@ components: []
         .setCustomId('ticket_delete')
         .setLabel('Delete Ticket')
         .setStyle(ButtonStyle.Danger)
-        .setEmoji('🗑️')
+        .setEmoji('🗑️'),
+      new ButtonBuilder()
+        .setCustomId('ticket_flag_scam')
+        .setLabel('Flag as Scam')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🚨')
     );
     
     await channel.send({ embeds: [closeEmbed], components: [controlRow] });
