@@ -80,9 +80,10 @@ export async function handleVerificationButton(interaction, client) {
             if (welcomeChannel) {
                 const { generateWelcomeCard } = await import('../utils/welcomeCard.js');
                 const avatarUrl = interaction.user.displayAvatarURL({ extension: 'png', size: 256 });
-                const memberCount = guild.memberCount;
+                const freshGuild = await guild.fetch().catch(() => guild);
+                const memberCount = freshGuild.memberCount || guild.memberCount;
                 
-                logger.info('[Welcome] Generating welcome card image...');
+                logger.info(`[Welcome] Generating welcome card image for memberCount: ${memberCount}...`);
                 const cardAttachment = await generateWelcomeCard(avatarUrl, interaction.user.username, guild.name, memberCount);
                 logger.info('[Welcome] Welcome card generated successfully. Sending message...');
 
