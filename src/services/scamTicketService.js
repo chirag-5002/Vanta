@@ -4,14 +4,10 @@ import {
   EmbedBuilder,
   ChannelType,
   PermissionFlagsBits,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
 } from 'discord.js';
 import { getTicketData, setInDb, getFromDb } from '../utils/database.js';
 import { getKycStatus } from './kycService.js';
 import { logger } from '../utils/logger.js';
-import { deleteTicket } from './ticket.js';
 
 function escapeHtml(text) {
   if (!text) return '';
@@ -207,9 +203,9 @@ export async function collectImageAttachments(messages) {
 }
 
 /**
- * Generates an interactive, dark-mode standalone HTML transcript file.
+ * Generates clean plain-text chat transcript file (opens cleanly in Discord without HTML markup).
  */
-export function generateDetailedScamTranscript({
+export function generateTextTranscript({
   channel,
   messages,
   scammerUser,
@@ -219,108 +215,106 @@ export function generateDetailedScamTranscript({
   kycStatus,
   collectedImages,
 }) {
-  const channelName = escapeHtml(channel.name);
-  const scammerTag = escapeHtml(scammerUser?.tag || scammerUser?.username || 'Unknown');
-  const scammerId = escapeHtml(scammerUser?.id || 'N/A');
-  const staffTag = escapeHtml(staffMember?.user?.tag || staffMember?.tag || staffMember?.displayName || 'Staff');
-  const reasonEscaped = escapeHtml(reason || 'No reason provided');
-  const notesEscaped = escapeHtml(notes || 'None');
-  const kycText = kycStatus?.status === 'verified' ? '🟢 Verified' : '🔴 Unverified';
+  const channelName = channel.name;
+  const scammerTag = scammerUser?.tag || scammerUser?.username || 'Unknown';
+  const scammerId = scammerUser?.id || 'N/A';
+  const staffTag = staffMember?.user?.tag || staffMember?.tag || staffMember?.displayName || 'Staff';
+  const kycText = kycStatus?.status === 'verified' ? 'Verified' : 'Unverified (No KYC)';
+  const dateStr = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
 
-  const rows = messages.map(msg => {
-    const ts = new Date(msg.createdTimestamp).toLocaleString('en-US', {
+  let text = `======================================================================\n`;
+  text += `🚨 ICN SCAM EVIDENCE DOSSIER - #${channelName}\n`;
+  text += `======================================================================\n`;
+  text += `Scammer User: ${scammerTag} (ID: ${scammerId})\n`;
+  text += `KYC Status:   ${kycText}\n`;
+  text += `Reported By:  ${staffTag}\n`;
+  text += `Reported At:  ${dateStr} IST\n`;
+  text += `Scam Reason:  ${reason || 'Scam Attempt'}\n`;
+  if (notes) text += `Staff Notes:  ${notes}\n`;
+  text += `Total Msgs:   ${messages.length}\n`;
+  text += `Images Saved: ${collectedImages.length}\n`;
+  text += `======================================================================\n\n`;
+  text += `--- TICKET CHAT LOG ---\n\n`;
+
+  for (const msg of messages) {
+    const time = new Date(msg.createdTimestamp).toLocaleTimeString('en-US', {
       timeZone: 'Asia/Kolkata',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: 'numeric',
+      hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
       hour12: true,
     });
-    const author = escapeHtml(msg.author?.tag || msg.author?.username || 'Unknown');
-    const isScammer = msg.author?.id === scammerUser?.id;
-    const authorClass = isScammer ? 'author-scammer' : (msg.author?.bot ? 'author-bot' : 'author-staff');
+    const author = msg.author?.tag || msg.author?.username || 'Unknown';
+    const isScammer = msg.author?.id === scammerUser?.id ? ' [SCAMMER]' : '';
+    const isBot = msg.author?.bot ? ' [BOT]' : '';
 
-    let content = escapeHtml(msg.content || '');
+    let content = msg.content || '';
     if (!content && msg.embeds.length > 0) {
-      content = '<em>[Embed Message]</em>';
+      const embedTitles = msg.embeds.map(e => e.title || e.description?.slice(0, 40) || 'Embed').join(', ');
+      content = `[Embed: ${embedTitles}]`;
     }
 
-    let attHtml = '';
+    let attText = '';
     if (msg.attachments && msg.attachments.size > 0) {
-      const atts = Array.from(msg.attachments.values()).map(a => {
-        const isImg = a.contentType?.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(a.name || '');
-        if (isImg) {
-          return `<div class="msg-img"><a href="${a.url}" target="_blank"><img src="${a.url}" alt="${escapeHtml(a.name)}" loading="lazy" /></a><br><small>${escapeHtml(a.name)}</small></div>`;
-        }
-        return `<div>📎 <a href="${a.url}" target="_blank" class="att-link">${escapeHtml(a.name)}</a></div>`;
-      }).join('');
-      attHtml = `<div class="attachments-box">${atts}</div>`;
+      const names = Array.from(msg.attachments.values()).map(a => a.name).join(', ');
+      attText = ` [Attachments: ${names}]`;
     }
 
-    return `
-      <div class="msg-row">
-        <div class="msg-meta">
-          <span class="${authorClass}">${author}</span>
-          <span class="ts">${ts} IST</span>
-        </div>
-        <div class="msg-text">${content}</div>
-        ${attHtml}
-      </div>
-    `;
-  }).join('\n');
+    text += `[${time}] ${author}${isScammer}${isBot}: ${content}${attText}\n`;
+  }
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>🚨 SCAM TICKET TRANSCRIPT – #${channelName}</title>
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #202225; color: #dcddde; margin: 0; padding: 24px; }
-  .header { background: #2f3136; border-left: 6px solid #e74c3c; border-radius: 8px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-  .header h1 { color: #fff; margin: 0 0 12px 0; font-size: 1.4rem; display: flex; align-items: center; gap: 8px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 0.9rem; }
-  .grid-item { background: #202225; padding: 10px 14px; border-radius: 6px; }
-  .grid-item strong { color: #8e9297; display: block; font-size: 0.75rem; text-transform: uppercase; margin-bottom: 4px; }
-  .grid-item span { color: #fff; font-weight: 500; }
-  .messages-container { background: #2f3136; border-radius: 8px; padding: 16px; }
-  .msg-row { border-bottom: 1px solid #36393f; padding: 12px 8px; }
-  .msg-row:last-child { border-bottom: none; }
-  .msg-meta { margin-bottom: 6px; font-size: 0.85rem; }
-  .author-scammer { color: #e74c3c; font-weight: bold; }
-  .author-staff { color: #2ecc71; font-weight: bold; }
-  .author-bot { color: #3498db; font-weight: bold; }
-  .ts { color: #72767d; margin-left: 10px; font-size: 0.75rem; }
-  .msg-text { color: #dcddde; line-height: 1.4; word-break: break-word; font-size: 0.95rem; }
-  .attachments-box { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 12px; }
-  .msg-img img { max-width: 320px; max-height: 240px; border-radius: 6px; border: 1px solid #40444b; display: block; }
-  .att-link { color: #00b0f4; text-decoration: none; }
-  .att-link:hover { text-decoration: underline; }
-</style>
-</head>
-<body>
-<div class="header">
-  <h1>🚨 Scam Evidence Dossier – #${channelName}</h1>
-  <div class="grid">
-    <div class="grid-item"><strong>Scammer User</strong><span>${scammerTag} (${scammerId})</span></div>
-    <div class="grid-item"><strong>KYC Status</strong><span>${kycText}</span></div>
-    <div class="grid-item"><strong>Reported By</strong><span>${staffTag}</span></div>
-    <div class="grid-item"><strong>Total Messages</strong><span>${messages.length}</span></div>
-    <div class="grid-item"><strong>Evidence Images</strong><span>${collectedImages.length}</span></div>
-    <div class="grid-item"><strong>Scam Reason</strong><span>${reasonEscaped}</span></div>
-    <div class="grid-item"><strong>Staff Notes</strong><span>${notesEscaped}</span></div>
-  </div>
-</div>
-<div class="messages-container">
-  ${rows}
-</div>
-</body>
-</html>`;
+  return Buffer.from(text, 'utf8');
+}
 
-  return Buffer.from(html, 'utf8');
+/**
+ * Builds a dedicated in-Discord Embed displaying the actual conversation history
+ * so staff/admin can read the entire discussion directly without opening any file.
+ */
+export function buildScamChatLogEmbed(messages, scammerUser) {
+  const lines = [];
+
+  for (const msg of messages) {
+    const time = new Date(msg.createdTimestamp).toLocaleTimeString('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    const isScammer = msg.author?.id === scammerUser?.id;
+    const authorPrefix = isScammer
+      ? `🔴 **${msg.author?.displayName || msg.author?.username}**`
+      : (msg.author?.bot ? `🤖 *${msg.author?.username}*` : `🟢 **${msg.author?.displayName || msg.author?.username}**`);
+
+    let content = msg.content ? msg.content.trim() : '';
+    if (!content && msg.embeds.length > 0) {
+      content = `*[Embed: ${msg.embeds[0].title || 'Ticket Embed'}]*`;
+    }
+
+    if (msg.attachments && msg.attachments.size > 0) {
+      const attNames = Array.from(msg.attachments.values()).map(a => `🖼️ *[${a.name}]*`).join(' ');
+      content = content ? `${content}\n> ↳ ${attNames}` : `> ↳ ${attNames}`;
+    }
+
+    if (content) {
+      lines.push(`> \`[${time}]\` ${authorPrefix}: ${content}`);
+    }
+  }
+
+  let fullChatText = lines.join('\n');
+  if (fullChatText.length > 3900) {
+    fullChatText = fullChatText.substring(0, 3850) + '\n\n*... [Full chat continued in attached text file]*';
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle('💬 Ticket Conversation History')
+    .setDescription(fullChatText || '*No text messages sent in this ticket.*')
+    .setColor('#34495E')
+    .setFooter({
+      text: 'Complete conversation transcript is also attached as a clean text file below.',
+    });
+
+  return embed;
 }
 
 /**
@@ -355,7 +349,7 @@ export function buildScamReportEmbed({
     .setTitle('🚨 SCAM INCIDENT REPORT')
     .setDescription(
       `An active ticket has been flagged as a **SCAM ATTEMPT** and archived for evidence.\n` +
-      `Admin/Owners can review the conversation, verify uploaded receipts/proofs, and share awareness alerts in <#beware-of-scams>.`
+      `Admin/Owners can review the conversation below, verify uploaded receipts/proofs, and share awareness alerts in <#beware-of-scams>.`
     )
     .setColor('#E74C3C')
     .addFields(
@@ -439,8 +433,8 @@ export async function logScamTicket(channel, staffMember, { reason, notes }) {
     // 2. Download all image proofs as fresh AttachmentBuilder buffers
     const collectedImages = await collectImageAttachments(allMessages);
 
-    // 3. Generate HTML Transcript buffer
-    const transcriptBuffer = generateDetailedScamTranscript({
+    // 3. Generate clean text transcript file
+    const textTranscriptBuffer = generateTextTranscript({
       channel,
       messages: allMessages,
       scammerUser,
@@ -451,14 +445,15 @@ export async function logScamTicket(channel, staffMember, { reason, notes }) {
       collectedImages,
     });
 
-    const transcriptAttachment = new AttachmentBuilder(transcriptBuffer, {
-      name: `scam-transcript-${channel.name}-${Date.now()}.html`,
+    const transcriptAttachment = new AttachmentBuilder(textTranscriptBuffer, {
+      name: `scam-chat-log-${channel.name}.txt`,
     });
 
     // 4. Resolve or create #scam-tickets
     const scamChannel = await resolveScamTicketsChannel(guild);
 
     if (scamChannel) {
+      // Build Report Embed
       const reportEmbed = buildScamReportEmbed({
         channel,
         scammerUser,
@@ -470,18 +465,21 @@ export async function logScamTicket(channel, staffMember, { reason, notes }) {
         imageCount: collectedImages.length,
       });
 
-      // Prepare files array: Transcript + Re-uploaded image proofs
+      // Build in-Discord Chat Conversation Embed
+      const chatEmbed = buildScamChatLogEmbed(allMessages, scammerUser);
+
+      // Prepare files array: Clean Text Transcript + Re-uploaded image proofs
       const filesToSend = [transcriptAttachment];
       for (const img of collectedImages) {
         filesToSend.push(img.builder);
       }
 
       await scamChannel.send({
-        embeds: [reportEmbed],
+        embeds: [reportEmbed, chatEmbed],
         files: filesToSend,
       });
 
-      logger.info(`Successfully logged scam ticket #${channel.name} to #${scamChannel.name} with ${collectedImages.length} images and HTML transcript.`);
+      logger.info(`Successfully logged scam ticket #${channel.name} to #${scamChannel.name} with direct chat embed, ${collectedImages.length} images, and clean text transcript.`);
     } else {
       logger.error('Could not resolve or create #scam-tickets channel to log scam incident!');
     }
@@ -501,7 +499,7 @@ export async function logScamTicket(channel, staffMember, { reason, notes }) {
       messageCount: allMessages.length,
       imageCount: collectedImages.length,
       timestamp: new Date().toISOString(),
-      messagesSummary: allMessages.slice(0, 50).map(m => ({
+      messagesSummary: allMessages.map(m => ({
         author: m.author?.tag || m.author?.username,
         authorId: m.author?.id,
         content: m.content,
