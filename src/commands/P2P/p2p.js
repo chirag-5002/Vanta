@@ -394,8 +394,8 @@ async function handlePaymentConfig(interaction) {
         defaultImpsName = '';
     } else if (profile === 'naman') {
         defaultUpiId = 'innercircle20@ibl';
-        defaultTrc20Wallet = 'TXNmuva3aqWdiNLjtY7BxmKvLyZzvh3xqB';
-        defaultBep20Wallet = '0xA657efcF628E36c2DE486A95e804218897997326';
+        defaultTrc20Wallet = 'TCpRGdPLdN2bm4aRtTqHpCbEw8Uh2h2rtT';
+        defaultBep20Wallet = '0xB6D7277EDEC09d6C40DE43f5A0C9CD02C66a1452';
         defaultImpsAccount = '4496001700126905';
         defaultImpsIfsc = 'PUNB0448600';
         defaultImpsName = 'Naman';
