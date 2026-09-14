@@ -305,34 +305,46 @@ export const p2pDetailsModalHandler = {
             const verificationTag = isKyc ? 'KYC Verified Deal' : 'Non-KYC Deal';
             let cardDescription = '';
 
+            let buyReceiveUsdt = 0;
+            let buyTotalInr = 0;
+
             if (isBuy) {
+                const isTrc = networkRaw.toUpperCase().includes('TRC');
+                const trcNetworkFee = isTrc ? 2 : 0;
                 const totalInr = amountVal * buyPrice;
-                let fee = 0;
+                buyTotalInr = totalInr;
+                let baseFee = 0;
                 let feePercentage = '';
                 if (isKyc) {
                     if (amountVal < 500) {
-                        fee = 2;
+                        baseFee = 2;
                         feePercentage = '$2';
                     } else {
-                        fee = amountVal * 0.005;
+                        baseFee = amountVal * 0.005;
                         feePercentage = '0.5%';
                     }
                 } else {
                     if (amountVal <= 100) {
-                        fee = 2;
+                        baseFee = 2;
                         feePercentage = '$2';
                     } else if (amountVal <= 500) {
-                        fee = 3;
+                        baseFee = 3;
                         feePercentage = '$3';
                     } else if (amountVal <= 1200) {
-                        fee = 5;
+                        baseFee = 5;
                         feePercentage = '$5';
                     } else {
-                        fee = amountVal * 0.005;
+                        baseFee = amountVal * 0.005;
                         feePercentage = '0.5%';
                     }
                 }
-                const receiveUsdt = amountVal - fee;
+                const totalFee = baseFee + trcNetworkFee;
+                const receiveUsdt = Math.max(0, amountVal - totalFee);
+                buyReceiveUsdt = receiveUsdt;
+
+                const feeBreakdownText = isTrc 
+                    ? `\`${feePercentage}\` base fee + \`$2\` TRC fee` 
+                    : `\`${feePercentage}\` fee`;
 
                 cardDescription = [
                     `Welcome <@${interaction.user.id}>! A verified Middleman / Support staff will assist your trade shortly.\n`,
@@ -341,7 +353,7 @@ export const p2pDetailsModalHandler = {
                     `> **1. Requested Amount:** \`${amountDisplay} USDT\``,
                     `> **2. Current Buy Rate:** \`₹${buyPrice.toFixed(2)} INR\``,
                     `> **3. Total INR to Pay:** \`₹${totalInr.toFixed(2)} INR\``,
-                    `> **4. Verification:** \`${verificationTag}\` (\`${feePercentage}\` fee)`,
+                    `> **4. Verification:** \`${verificationTag}\` (${feeBreakdownText})`,
                     `> **5. Net USDT You Receive:** \`${receiveUsdt.toFixed(2)} USDT\``,
                     `> **6. Payment Method:** \`${paymentMethod}\``,
                     `> **7. Crypto Network:** \`${networkLabel}\``,
@@ -398,27 +410,7 @@ export const p2pDetailsModalHandler = {
 
             // 4. Auto-dispatch Payment QR Code / Bank Details or Deposit Wallet
             if (isBuy) {
-                const totalInr = amountVal * buyPrice;
-                let fee = 0;
-                if (isKyc) {
-                    if (amountVal < 500) {
-                        fee = 2;
-                    } else {
-                        fee = amountVal * 0.005;
-                    }
-                } else {
-                    if (amountVal <= 100) {
-                        fee = 2;
-                    } else if (amountVal <= 500) {
-                        fee = 3;
-                    } else if (amountVal <= 1200) {
-                        fee = 5;
-                    } else {
-                        fee = amountVal * 0.005;
-                    }
-                }
-                const receiveUsdt = amountVal - fee;
-                const paymentEmbed = buildBuyPaymentEmbed(paymentMethod, paymentConfig, totalInr, receiveUsdt);
+                const paymentEmbed = buildBuyPaymentEmbed(paymentMethod, paymentConfig, buyTotalInr, buyReceiveUsdt);
                 await ticketChannel.send({ embeds: [paymentEmbed] });
 
                 // Initialize ticket P2P state to waiting_payment_proof

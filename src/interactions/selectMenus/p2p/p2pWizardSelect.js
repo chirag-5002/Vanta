@@ -32,7 +32,10 @@ export function buildWizardComponents(tradeType, kycType, selectedPayment = null
         .addOptions(paymentOptionsMapped);
 
     // Network Options
-    const networkOptions = [
+    const networkOptions = isBuy ? [
+        { label: 'USDT TRC20 (+$2 Network Fee)', value: 'USDT_TRC20', emoji: '🟢', description: '+$2 network fee applied' },
+        { label: 'USDT BEP20 (Standard Fee)', value: 'USDT_BEP20', emoji: '🟡', description: 'Standard fee (no extra network charge)' },
+    ] : [
         { label: 'USDT TRC20', value: 'USDT_TRC20', emoji: '🟢' },
         { label: 'USDT BEP20', value: 'USDT_BEP20', emoji: '🟡' },
     ];

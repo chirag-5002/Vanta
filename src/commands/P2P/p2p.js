@@ -480,12 +480,15 @@ async function handleTicketPanel(interaction) {
             .setDescription(
                 `Welcome to **${interaction.guild.name}** USDT Buying Portal!\n\n` +
                 `Select an option below to open an instant 1-on-1 Middleman Buy Ticket:\n\n` +
-                `• **🟢 Buy with KYC:** Only **0.5% fee** (You receive **99.5%** of requested USDT).\n` +
-                `• **🟢 Buy without KYC:** Tiered fees apply:\n` +
-                `  - **$50 - $100:** **$2** flat fee\n` +
-                `  - **$101 - $500:** **$3** flat fee\n` +
-                `  - **$501 - $1200:** **$5** flat fee\n` +
-                `  - **$1200 - $10000:** **0.5%** fee of amount\n\n` +
+                `• **🟢 Buy with KYC:**\n` +
+                `  - **$50 - $499:** **$2** flat fee (BEP20) | **$4** flat fee (TRC20)\n` +
+                `  - **$500 - $10000:** **0.5%** fee (+ **$2** for TRC20)\n` +
+                `• **🟢 Buy without KYC:**\n` +
+                `  - **$50 - $100:** **$2** flat fee (BEP20) | **$4** flat fee (TRC20)\n` +
+                `  - **$101 - $500:** **$3** flat fee (BEP20) | **$5** flat fee (TRC20)\n` +
+                `  - **$501 - $1200:** **$5** flat fee (BEP20) | **$7** flat fee (TRC20)\n` +
+                `  - **$1200 - $10000:** **0.5%** fee (+ **$2** for TRC20)\n\n` +
+                `🌐 *Note: TRC20 transfers incur an additional **$2** network fee.*\n` +
                 `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
             )
             .setColor('#2ECC71')

@@ -204,7 +204,7 @@ export async function autoDeployP2PPanels(guild) {
 
         if (buyChannel) {
             const msgs = await buyChannel.messages.fetch({ limit: 10 }).catch(() => null);
-            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_buy_kyc')) && m.embeds.some(e => e.description?.includes('$50 - $499') && e.description?.includes('Tiered fees')));
+            const botHasNewPanel = msgs && msgs.some(m => m.author.id === guild.client.user.id && m.components.some(row => row.components.some(b => b.customId === 'p2p_trade_buy_kyc')) && m.embeds.some(e => e.description?.includes('TRC20') && e.description?.includes('BEP20')));
             
             if (!botHasNewPanel) {
                 if (msgs) {
@@ -219,15 +219,16 @@ export async function autoDeployP2PPanels(guild) {
                     .setDescription(
                         `Welcome to **${guild.name}** USDT Buying Portal!\n\n` +
                         `Select an option below to open an instant 1-on-1 Middleman Buy Ticket:\n\n` +
-                        `• **🟢 Buy with KYC:** Tiered fees apply:\n` +
-                        `  - **$50 - $499:** **$2** flat fee\n` +
-                        `  - **$500 - $10000:** **0.5%** fee of amount\n` +
-                        `• **🟢 Buy without KYC:** Tiered fees apply:\n` +
-                        `  - **$50 - $100:** **$2** flat fee\n` +
-                        `  - **$101 - $500:** **$3** flat fee\n` +
-                        `  - **$501 - $1200:** **$5** flat fee\n` +
-                        `  - **$1200 - $10000:** **0.5%** fee of amount\n\n` +
-                        `*🛡️ All trades are 100% protected by ICN Auto-MM Security.*`
+                        `• **🟢 Buy with KYC:**\n` +
+                        `  - **$50 - $499:** **$2** flat fee (BEP20) | **$4** flat fee (TRC20)\n` +
+                        `  - **$500 - $10000:** **0.5%** fee (+ **$2** for TRC20)\n` +
+                        `• **🟢 Buy without KYC:**\n` +
+                        `  - **$50 - $100:** **$2** flat fee (BEP20) | **$4** flat fee (TRC20)\n` +
+                        `  - **$101 - $500:** **$3** flat fee (BEP20) | **$5** flat fee (TRC20)\n` +
+                        `  - **$501 - $1200:** **$5** flat fee (BEP20) | **$7** flat fee (TRC20)\n` +
+                        `  - **$1200 - $10000:** **0.5%** fee (+ **$2** for TRC20)\n\n` +
+                        `🌐 *Note: TRC20 transfers incur an additional **$2** network fee.*\n` +
+                        `🛡️ *All trades are 100% protected by ICN Auto-MM Security.*`
                     )
                     .setColor('#2ECC71')
                     .setFooter({ text: `${guild.name} • Official P2P Buy Portal` });
