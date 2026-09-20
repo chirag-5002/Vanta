@@ -5,6 +5,7 @@ import { logger } from '../utils/logger.js';
 export const DEFAULT_P2P_CONFIG = {
     dealChannelId: null,
     vouchChannelId: null,
+    certificateChannelId: null,
     staffRoleId: null,
     priceChannelId: null,
     titleText: 'Successful Transaction',
@@ -541,6 +542,9 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
     // Post to transaction-details if it exists
     await sendTransactionDetailsLog(channel.guild, dealRecord).catch(() => null);
 
+    // Post to transactions-certificate if it exists
+    await sendTransactionCertificate(channel.guild, dealRecord).catch(() => null);
+
     return dealRecord;
 }
 
@@ -837,7 +841,7 @@ export async function logDeal(guildId, dealData, botId = null) {
     const rawDeals = await getFromDb(dealsKey, []);
     const deals = Array.isArray(rawDeals) ? rawDeals : [];
 
-    const dealId = `DEAL-${Date.now().toString(36).toUpperCase()}`;
+    const dealId = dealData.dealId || `ICN-TX-${Date.now().toString(36).toUpperCase()}`;
     const timestamp = new Date().toISOString();
 
     const record = {
@@ -1088,4 +1092,102 @@ export async function sendTransactionDetailsLog(guild, deal) {
         logger.error('[P2P] Failed to send transaction details log:', err);
     }
 }
+
+/**
+ * Sends a prestigious ICN Transaction Achievement Award Certificate image into the #transactions-certificate channel.
+ */
+export async function sendTransactionCertificate(guild, deal) {
+    if (!guild || !deal) return;
+    try {
+        const config = await getP2PConfig(guild.id).catch(() => null) || DEFAULT_P2P_CONFIG;
+        const guildChannels = await guild.channels.fetch().catch(() => null) || guild.channels.cache;
+        if (!guildChannels) return;
+
+        let targetChannel = null;
+        if (config.certificateChannelId) {
+            targetChannel = guildChannels.get(config.certificateChannelId);
+        }
+
+        if (!targetChannel) {
+            // 1. Direct name matches (with or without 's')
+            targetChannel = guildChannels.find(c =>
+                c && c.type === ChannelType.GuildText && (
+                    c.name.toLowerCase() === 'transaction-certificate' ||
+                    c.name.toLowerCase() === 'transactions-certificate' ||
+                    c.name.toLowerCase() === 'transaction-certificates' ||
+                    c.name.toLowerCase() === 'transaction-cert' ||
+                    c.name.toLowerCase() === 'transactions-cert' ||
+                    c.name.toLowerCase().includes('transaction-certificate') ||
+                    c.name.toLowerCase().includes('transactions-certificate') ||
+                    c.name.toLowerCase().includes('transaction-cert')
+                )
+            );
+
+            // 2. Emoji-tolerant normalized check (e.g. 📜・transaction-certificate)
+            if (!targetChannel) {
+                targetChannel = guildChannels.find(c => {
+                    if (!c || c.type !== ChannelType.GuildText) return false;
+                    const normalized = c.name.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                    return normalized === 'transaction-certificate' ||
+                           normalized === 'transactions-certificate' ||
+                           normalized.includes('transaction-certificate') ||
+                           normalized.includes('transactions-certificate') ||
+                           normalized.includes('transactioncert');
+                });
+            }
+        }
+
+        if (!targetChannel) {
+            logger.warn(`[P2P] 'transactions-certificate' channel not found in guild ${guild.id}`);
+            return;
+        }
+
+        // Determine human recipient trader
+        const botId = guild.client?.user?.id;
+        const humanUserId = (deal.buyerId === 'server' || deal.buyerId === botId) 
+            ? deal.sellerId 
+            : deal.buyerId;
+
+        let traderDisplayName = deal.buyerName || deal.sellerName || 'Valued Trader';
+
+        if (humanUserId && humanUserId !== 'server' && humanUserId !== botId) {
+            try {
+                const member = await guild.members.fetch(humanUserId).catch(() => null);
+                if (member) {
+                    traderDisplayName = member.displayName || member.user?.globalName || member.user?.username || traderDisplayName;
+                } else {
+                    const user = await guild.client.users.fetch(humanUserId).catch(() => null);
+                    if (user) {
+                        traderDisplayName = user.globalName || user.username || traderDisplayName;
+                    }
+                }
+            } catch (fetchErr) {
+                logger.debug('Could not fetch member for certificate name:', fetchErr.message);
+            }
+        }
+
+        const { generateTransactionCertificate } = await import('../utils/transactionCertificateCard.js');
+        const attachment = await generateTransactionCertificate({
+            traderName: traderDisplayName,
+            amount: deal.usdtAmount || 500,
+            date: deal.timestamp ? new Date(deal.timestamp) : new Date(),
+            dealId: deal.dealId || `ICN-TX-${Date.now().toString(36).toUpperCase()}`,
+            guildName: guild.name || 'ICN Network'
+        });
+
+        if (!attachment) {
+            logger.error('[P2P] Failed to generate transaction certificate attachment.');
+            return;
+        }
+
+        await targetChannel.send({
+            files: [attachment]
+        });
+
+        logger.info(`[P2P] Successfully posted transaction certificate image to #${targetChannel.name} for ${traderDisplayName} (${deal.usdtAmount} USDT)`);
+    } catch (err) {
+        logger.error('[P2P] Failed to send transaction certificate:', err);
+    }
+}
+
 

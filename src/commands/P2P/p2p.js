@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents, sendVouchMessagesAndScheduleClose, sendTransactionDetailsLog } from '../../services/p2pService.js';
+import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents, sendVouchMessagesAndScheduleClose, sendTransactionDetailsLog, sendTransactionCertificate } from '../../services/p2pService.js';
 import { getTicketData, saveTicketData, deleteFromDb } from '../../utils/database.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -228,6 +228,12 @@ export default {
                         .addChannelTypes(ChannelType.GuildText)
                         .setRequired(false)
                 )
+                .addChannelOption(option =>
+                    option.setName('certificate_channel')
+                        .setDescription('Channel where Achievement Award certificates will be posted (e.g. #transactions-certificate)')
+                        .addChannelTypes(ChannelType.GuildText)
+                        .setRequired(false)
+                )
                 .addRoleOption(option =>
                     option.setName('staff_role')
                         .setDescription('Middleman / Staff role authorized to log deals')
@@ -243,6 +249,29 @@ export default {
                         .setDescription('Minimum USDT buy/sell quantity limit (Default: 50)')
                         .setRequired(false)
                         .setMinValue(1)
+                )
+        )
+
+        // Subcommand: Generate / Preview Transaction Certificate
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('certificate')
+                .setDescription('Generates and previews an ICN Transaction Achievement Award Certificate.')
+                .addUserOption(option =>
+                    option.setName('user')
+                        .setDescription('Trader to present the certificate to')
+                        .setRequired(true)
+                )
+                .addNumberOption(option =>
+                    option.setName('usdt_amount')
+                        .setDescription('Transaction USDT volume (e.g. 500)')
+                        .setRequired(true)
+                )
+                .addChannelOption(option =>
+                    option.setName('channel')
+                        .setDescription('Optional channel to post certificate into (defaults to current channel/preview)')
+                        .addChannelTypes(ChannelType.GuildText)
+                        .setRequired(false)
                 )
         )
 
@@ -349,6 +378,10 @@ export default {
 
         if (subcommand === 'setup') {
             return await handleSetup(interaction);
+        }
+
+        if (subcommand === 'certificate') {
+            return await handleCertificate(interaction);
         }
 
         if (subcommand === 'stats') {
@@ -744,6 +777,9 @@ async function handleAutoLog(interaction) {
     // Post to transaction-details if it exists
     await sendTransactionDetailsLog(interaction.guild, dealRecord).catch(() => null);
 
+    // Post to transactions-certificate if it exists
+    await sendTransactionCertificate(interaction.guild, dealRecord).catch(() => null);
+
     if (targetChannel && targetChannel.id !== interaction.channel?.id) {
         const sentMsg = await targetChannel.send({
             embeds: [dealEmbed]
@@ -781,6 +817,7 @@ async function handleSetup(interaction) {
 
     const dealChannel = interaction.options.getChannel('deal_channel');
     const vouchChannel = interaction.options.getChannel('vouch_channel');
+    const certChannel = interaction.options.getChannel('certificate_channel');
     const staffRole = interaction.options.getRole('staff_role');
     const footerText = interaction.options.getString('footer');
     const minQty = interaction.options.getInteger('min_qty');
@@ -788,6 +825,7 @@ async function handleSetup(interaction) {
     const updateObj = {};
     if (dealChannel) updateObj.dealChannelId = dealChannel.id;
     if (vouchChannel) updateObj.vouchChannelId = vouchChannel.id;
+    if (certChannel) updateObj.certificateChannelId = certChannel.id;
     if (staffRole) updateObj.staffRoleId = staffRole.id;
     if (footerText) updateObj.footerText = footerText;
     if (minQty !== null) updateObj.minTradeAmount = minQty;
@@ -796,6 +834,7 @@ async function handleSetup(interaction) {
         const currentConfig = await getP2PConfig(interaction.guildId);
         const dealChanStr = currentConfig.dealChannelId ? `<#${currentConfig.dealChannelId}>` : 'Not Set';
         const vouchChanStr = currentConfig.vouchChannelId ? `<#${currentConfig.vouchChannelId}>` : 'Not Set';
+        const certChanStr = currentConfig.certificateChannelId ? `<#${currentConfig.certificateChannelId}>` : 'Auto-detect (`#transactions-certificate`)';
         const staffRoleStr = currentConfig.staffRoleId ? `<@&${currentConfig.staffRoleId}>` : 'None (Admins Only)';
         const minTradeLimit = currentConfig.minTradeAmount !== undefined ? currentConfig.minTradeAmount : 50;
         let statusStr = '';
@@ -815,6 +854,7 @@ async function handleSetup(interaction) {
                     `• **Transactions Status:** ${statusStr}\n` +
                     `• **Deal Log Channel:** ${dealChanStr}\n` +
                     `• **Vouch Channel:** ${vouchChanStr}\n` +
+                    `• **Certificate Channel:** ${certChanStr}\n` +
                     `• **Staff / Middleman Role:** ${staffRoleStr}\n` +
                     `• **Minimum Quantity Limit:** \`${minTradeLimit} USDT\`\n` +
                     `• **Footer Label:** \`${currentConfig.footerText}\`_\n\n` +
@@ -829,6 +869,7 @@ async function handleSetup(interaction) {
     const changes = [];
     if (dealChannel) changes.push(`• **Deal Log Channel:** <#${dealChannel.id}>`);
     if (vouchChannel) changes.push(`• **Vouch Channel:** <#${vouchChannel.id}>`);
+    if (certChannel) changes.push(`• **Certificate Channel:** <#${certChannel.id}>`);
     if (staffRole) changes.push(`• **Staff Role:** <@&${staffRole.id}>`);
     if (footerText) changes.push(`• **Footer Label:** \`${footerText}\``);
     if (minQty !== null) changes.push(`• **Minimum Quantity Limit:** \`${minQty} USDT\``);
@@ -918,6 +959,9 @@ async function handleDeal(interaction) {
 
     // Post to transaction-details if it exists
     await sendTransactionDetailsLog(interaction.guild, dealRecord).catch(() => null);
+
+    // Post to transactions-certificate if it exists
+    await sendTransactionCertificate(interaction.guild, dealRecord).catch(() => null);
 
     const name = interaction.channel?.name?.toLowerCase() || '';
     const isTicket = name.includes('ticket') || name.startsWith('buy-') || name.startsWith('sell-') || name.startsWith('p2p-');
@@ -1142,3 +1186,59 @@ async function handleToggle(interaction) {
         ]
     });
 }
+
+/**
+ * Handle manual Certificate generation & preview
+ */
+async function handleCertificate(interaction) {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+        return await replyUserError(interaction, {
+            type: ErrorTypes.PERMISSION,
+            message: 'You need `Manage Server` permission to generate transaction certificates.'
+        });
+    }
+
+    const targetUser = interaction.options.getUser('user');
+    const usdtAmount = interaction.options.getNumber('usdt_amount');
+    const channelOverride = interaction.options.getChannel('channel');
+
+    const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+    const traderDisplayName = member?.displayName || targetUser.globalName || targetUser.username;
+
+    const { generateTransactionCertificate } = await import('../../utils/transactionCertificateCard.js');
+    const attachment = await generateTransactionCertificate({
+        traderName: traderDisplayName,
+        amount: usdtAmount,
+        date: new Date(),
+        dealId: `ICN-TX-${Date.now().toString(36).toUpperCase()}`,
+        guildName: interaction.guild.name || 'ICN Network'
+    });
+
+    if (!attachment) {
+        return await replyUserError(interaction, {
+            type: ErrorTypes.GENERIC,
+            message: 'Failed to generate transaction certificate.'
+        });
+    }
+
+    if (channelOverride && channelOverride.id !== interaction.channelId) {
+        await channelOverride.send({
+            files: [attachment]
+        });
+
+        return await InteractionHelper.safeEditReply(interaction, {
+            embeds: [
+                successEmbed(
+                    'Certificate Dispatched!',
+                    `Achievement Award Certificate for **${traderDisplayName}** ($${usdtAmount} USDT) has been posted in <#${channelOverride.id}>!`
+                )
+            ]
+        });
+    } else {
+        return await InteractionHelper.safeEditReply(interaction, {
+            content: `🏆 **Achievement Award Preview for** <@${targetUser.id}> ($${usdtAmount} USDT)`,
+            files: [attachment]
+        });
+    }
+}
+
