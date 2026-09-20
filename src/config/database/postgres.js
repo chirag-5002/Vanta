@@ -89,7 +89,12 @@ export function resolvePostgresPoolConfig() {
     };
 
     if (url && url !== DEFAULT_POSTGRES_URL) {
-        return { connectionString: url, ...sharedOptions };
+        const cleanUrl = url.replace(/([?&])sslmode=[^&]+(&|$)/i, '$1').replace(/[?&]$/, '');
+        return { 
+            connectionString: cleanUrl, 
+            ...sharedOptions, 
+            ssl: ssl !== false ? (ssl || { rejectUnauthorized: false }) : false 
+        };
     }
 
     return {
