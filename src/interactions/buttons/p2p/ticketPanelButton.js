@@ -3,6 +3,7 @@ import { wizardSelections } from '../../selectMenus/p2p/p2pWizardSelect.js';
 import { getFromDb, getP2PUserStatsKey } from '../../../utils/database.js';
 import { logger } from '../../../utils/logger.js';
 import { getP2PConfig } from '../../../services/p2pService.js';
+import { getKycStatus } from '../../../services/kycService.js';
 
 // ==================== STEP 1: Show Amount Modal ====================
 
@@ -13,7 +14,47 @@ export const p2pTradeButtonHandler = {
         const kycType = args[1] || 'kyc';
         const isBuy = tradeType === 'buy';
 
-        const config = await getP2PConfig(interaction.guildId);
+        // 1. Instant Time Restriction Check (11 PM to 9 AM Kolkata timezone) - 0ms
+        const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour: 'numeric',
+            hourCycle: 'h23',
+        }).format(new Date());
+        const hour = parseInt(kolkataTimeStr, 10);
+        if (hour >= 23 || hour < 9) {
+            await interaction.reply({
+                content: `⚠️ **We are not doing transactions between 11pm and 9am.**\n*This message will automatically disappear in 5 minutes.*`,
+                flags: MessageFlags.Ephemeral
+            });
+
+            setTimeout(async () => {
+                try {
+                    await interaction.deleteReply();
+                } catch (e) {
+                    // Ignore errors
+                }
+            }, 5 * 60 * 1000);
+            return;
+        }
+
+        // 2. Parallel check for config, ban status, daily limits, and KYC
+        const today = new Date().toISOString().split('T')[0];
+        const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${interaction.user.id}:${today}`;
+
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 1500));
+        const fetchChecks = Promise.all([
+            getP2PConfig(interaction.guildId),
+            getFromDb(`guild:${interaction.guildId}:p2p:ban_until:${interaction.user.id}`, 0),
+            getFromDb(dailyTicketsKey, 0),
+            kycType === 'kyc' ? getKycStatus(interaction.guildId, interaction.user.id) : Promise.resolve({ status: 'verified' })
+        ]);
+
+        const results = await Promise.race([fetchChecks, timeoutPromise]);
+        const config = results?.[0] || await getP2PConfig(interaction.guildId);
+        const banUntil = results?.[1] || 0;
+        const dailyCount = results?.[2] || 0;
+        const kycStatus = results?.[3] || { status: 'verified' };
+
         if (config?.disabled) {
             return await interaction.reply({
                 content: `❌ **We are not doing any transactions right now. Soon we will operate.**`,
@@ -35,31 +76,7 @@ export const p2pTradeButtonHandler = {
             });
         }
 
-        // Check time restriction (11 PM to 9 AM Kolkata timezone)
-        const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Kolkata',
-            hour: 'numeric',
-            hourCycle: 'h23',
-        }).format(new Date());
-        const hour = parseInt(kolkataTimeStr, 10);
-        if (hour >= 23 || hour < 9) {
-            await interaction.reply({
-                content: `⚠️ **We are not doing transactions between 11pm and 9am.**\n*This message will automatically disappear in 5 minutes.*`,
-                flags: MessageFlags.Ephemeral
-            });
-
-            setTimeout(async () => {
-                try {
-                    await interaction.deleteReply();
-                } catch (e) {
-                    // Ignore errors (e.g. if user already dismissed/deleted it or interaction expired)
-                }
-            }, 5 * 60 * 1000);
-            return;
-        }
-
-        // 1. Check if user is P2P banned
-        const banUntil = await getFromDb(`guild:${interaction.guildId}:p2p:ban_until:${interaction.user.id}`, 0);
+        // Check if user is P2P banned
         if (banUntil && Date.now() < banUntil) {
             const expiresTimestamp = Math.floor(banUntil / 1000);
             return await interaction.reply({
@@ -68,10 +85,7 @@ export const p2pTradeButtonHandler = {
             });
         }
 
-        // 2. Check daily P2P ticket limit (Max 3/day)
-        const today = new Date().toISOString().split('T')[0];
-        const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${interaction.user.id}:${today}`;
-        const dailyCount = await getFromDb(dailyTicketsKey, 0);
+        // Check daily P2P ticket limit (Max 3/day)
         if (dailyCount >= 3) {
             const userStatsKey = getP2PUserStatsKey(interaction.guildId, interaction.user.id);
             const stats = await getFromDb(userStatsKey, { completedDeals: 0 });
@@ -86,35 +100,30 @@ export const p2pTradeButtonHandler = {
         }
 
         // KYC check if required
-        if (kycType === 'kyc') {
-            const { getKycStatus } = await import('../../../services/kycService.js');
-            const kycStatus = await getKycStatus(interaction.guildId, interaction.user.id);
-            
-            if (kycStatus.status !== 'verified') {
-                const statusLabel = kycStatus.status === 'pending' ? '⏳ Pending Review' : kycStatus.status === 'rejected' ? '❌ Rejected' : 'Not Started';
-                const embed = new EmbedBuilder()
-                    .setTitle('🔒 KYC Verification Required')
-                    .setDescription(
-                        `To trade with KYC on this server, you must complete identity verification first.\n\n` +
-                        `• **Current Status:** \`${statusLabel}\`\n` +
-                        (kycStatus.status === 'rejected' ? `• **Reason:** \`${kycStatus.rejectionReason}\`\n\n` : '\n') +
-                        `Please click the button below to start your one-time verification.`
-                    )
-                    .setColor('#FFC107');
+        if (kycType === 'kyc' && kycStatus.status !== 'verified') {
+            const statusLabel = kycStatus.status === 'pending' ? '⏳ Pending Review' : kycStatus.status === 'rejected' ? '❌ Rejected' : 'Not Started';
+            const embed = new EmbedBuilder()
+                .setTitle('🔒 KYC Verification Required')
+                .setDescription(
+                    `To trade with KYC on this server, you must complete identity verification first.\n\n` +
+                    `• **Current Status:** \`${statusLabel}\`\n` +
+                    (kycStatus.status === 'rejected' ? `• **Reason:** \`${kycStatus.rejectionReason}\`\n\n` : '\n') +
+                    `Please click the button below to start your one-time verification.`
+                )
+                .setColor('#FFC107');
 
-                const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('kyc_start_verification')
-                        .setLabel('🔒 Start KYC Verification')
-                        .setStyle(ButtonStyle.Success)
-                );
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('kyc_start_verification')
+                    .setLabel('🔒 Start KYC Verification')
+                    .setStyle(ButtonStyle.Success)
+            );
 
-                return await interaction.reply({
-                    embeds: [embed],
-                    components: [row],
-                    flags: MessageFlags.Ephemeral
-                });
-            }
+            return await interaction.reply({
+                embeds: [embed],
+                components: [row],
+                flags: MessageFlags.Ephemeral
+            });
         }
 
         // Clear any previous wizard state

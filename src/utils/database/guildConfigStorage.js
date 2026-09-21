@@ -16,12 +16,25 @@ export function unwrapReplitData(data) {
     return data;
 }
 
+// In-memory cache for guild configs (3 min TTL)
+const guildConfigCache = new Map();
+const GUILD_CONFIG_CACHE_TTL_MS = 3 * 60 * 1000;
+
 /**
  * Low-level guild config read. Returns normalized config with defaults;
  * never throws — callers use the guild config service for typed errors.
  */
 export async function readGuildConfig(client, guildId, context = {}) {
     try {
+        if (!guildId) {
+            return normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
+        }
+
+        const cached = guildConfigCache.get(guildId);
+        if (cached && (Date.now() - cached.timestamp < GUILD_CONFIG_CACHE_TTL_MS)) {
+            return cached.data;
+        }
+
         if (!client?.db || typeof client.db.get !== 'function') {
             logger.warn(`Database unavailable for readGuildConfig in guild ${guildId}`);
             return normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
@@ -38,11 +51,15 @@ export async function readGuildConfig(client, guildId, context = {}) {
         const rawConfig = await client.db.get(getGuildConfigKey(guildId), null);
 
         if (rawConfig === null) {
-            return normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
+            const defaultConfig = normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
+            guildConfigCache.set(guildId, { data: defaultConfig, timestamp: Date.now() });
+            return defaultConfig;
         }
 
         const cleanedConfig = unwrapReplitData(rawConfig);
-        return normalizeGuildConfig(cleanedConfig, GUILD_CONFIG_DEFAULTS);
+        const normalized = normalizeGuildConfig(cleanedConfig, GUILD_CONFIG_DEFAULTS);
+        guildConfigCache.set(guildId, { data: normalized, timestamp: Date.now() });
+        return normalized;
     } catch (error) {
         logger.error(`Error fetching config for guild ${guildId}`, {
             error,
@@ -80,5 +97,6 @@ export async function writeGuildConfig(client, guildId, config, context = {}) {
         );
     }
 
+    guildConfigCache.set(guildId, { data: validated, timestamp: Date.now() });
     return validated;
 }

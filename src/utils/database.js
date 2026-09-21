@@ -294,17 +294,13 @@ export async function getEndedGiveaways(client) {
         }
 
         if (wrapper.isDegraded?.()) {
-            logger.debug('Postgres SQL unavailable for ended giveaways; scanning key-value store');
+            return await getEndedGiveawaysFromKv(client);
         }
 
-        return await getEndedGiveawaysFromKv(client);
+        return [];
     } catch (error) {
         logger.error('Error getting ended giveaways:', error);
-        try {
-            return await getEndedGiveawaysFromKv(client);
-        } catch {
-            return [];
-        }
+        return [];
     }
 }
 

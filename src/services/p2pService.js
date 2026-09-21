@@ -29,14 +29,25 @@ export const DEFAULT_PAYMENT_CONFIG = {
     bep20Wallet: '0x71C569ICNUSDTBEP20OfficialWalletAddress',
 };
 
+// In-memory cache for P2P configs (2 min TTL)
+const p2pConfigCache = new Map();
+const p2pPaymentCache = new Map();
+const CACHE_TTL_MS = 2 * 60 * 1000;
+
 /**
- * Retrieves the P2P configuration for a guild.
+ * Retrieves the P2P configuration for a guild with in-memory caching.
  */
 export async function getP2PConfig(guildId) {
     if (!guildId) return { ...DEFAULT_P2P_CONFIG };
+    const cached = p2pConfigCache.get(guildId);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+        return { ...DEFAULT_P2P_CONFIG, ...cached.data };
+    }
     const key = getP2PConfigKey(guildId);
     const data = await getFromDb(key, {});
-    return { ...DEFAULT_P2P_CONFIG, ...data };
+    const config = { ...DEFAULT_P2P_CONFIG, ...data };
+    p2pConfigCache.set(guildId, { data: config, timestamp: Date.now() });
+    return config;
 }
 
 /**
@@ -48,17 +59,24 @@ export async function saveP2PConfig(guildId, newConfig) {
     const updated = { ...current, ...newConfig };
     const key = getP2PConfigKey(guildId);
     await setInDb(key, updated);
+    p2pConfigCache.set(guildId, { data: updated, timestamp: Date.now() });
     return updated;
 }
 
 /**
- * Retrieves payment configuration for a guild.
+ * Retrieves payment configuration for a guild with in-memory caching.
  */
 export async function getP2PPaymentConfig(guildId) {
     if (!guildId) return { ...DEFAULT_PAYMENT_CONFIG };
+    const cached = p2pPaymentCache.get(guildId);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+        return { ...DEFAULT_PAYMENT_CONFIG, ...cached.data };
+    }
     const key = `guild:${guildId}:p2p:payments`;
     const data = await getFromDb(key, {});
-    return { ...DEFAULT_PAYMENT_CONFIG, ...data };
+    const config = { ...DEFAULT_PAYMENT_CONFIG, ...data };
+    p2pPaymentCache.set(guildId, { data: config, timestamp: Date.now() });
+    return config;
 }
 
 /**
@@ -70,6 +88,7 @@ export async function saveP2PPaymentConfig(guildId, newPayments) {
     const updated = { ...current, ...newPayments };
     const key = `guild:${guildId}:p2p:payments`;
     await setInDb(key, updated);
+    p2pPaymentCache.set(guildId, { data: updated, timestamp: Date.now() });
     return updated;
 }
 

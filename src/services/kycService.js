@@ -26,11 +26,22 @@ export const DEFAULT_KYC_CONFIG = {
 export const getKycConfigKey = (guildId) => `guild:${guildId}:kyc:config`;
 export const getKycUserKey = (guildId, userId) => `guild:${guildId}:kyc:user:${userId}`;
 
+// In-memory cache for KYC (2 min TTL)
+const kycConfigCache = new Map();
+const kycStatusCache = new Map();
+const KYC_CACHE_TTL_MS = 2 * 60 * 1000;
+
 export async function getKycConfig(guildId) {
     if (!guildId) return { ...DEFAULT_KYC_CONFIG };
+    const cached = kycConfigCache.get(guildId);
+    if (cached && (Date.now() - cached.timestamp < KYC_CACHE_TTL_MS)) {
+        return { ...DEFAULT_KYC_CONFIG, ...cached.data };
+    }
     const key = getKycConfigKey(guildId);
     const data = await getFromDb(key, {});
-    return { ...DEFAULT_KYC_CONFIG, ...data };
+    const config = { ...DEFAULT_KYC_CONFIG, ...data };
+    kycConfigCache.set(guildId, { data: config, timestamp: Date.now() });
+    return config;
 }
 
 export async function saveKycConfig(guildId, newConfig) {
@@ -39,14 +50,22 @@ export async function saveKycConfig(guildId, newConfig) {
     const updated = { ...current, ...newConfig };
     const key = getKycConfigKey(guildId);
     await setInDb(key, updated);
+    kycConfigCache.set(guildId, { data: updated, timestamp: Date.now() });
     return updated;
 }
 
 export async function getKycStatus(guildId, userId) {
     if (!guildId || !userId) return { status: 'none', userId, guildId };
+    const cacheKey = `${guildId}:${userId}`;
+    const cached = kycStatusCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < KYC_CACHE_TTL_MS)) {
+        return { status: 'none', userId, guildId, ...cached.data };
+    }
     const key = getKycUserKey(guildId, userId);
     const data = await getFromDb(key, {});
-    return { status: 'none', userId, guildId, ...data };
+    const status = { status: 'none', userId, guildId, ...data };
+    kycStatusCache.set(cacheKey, { data: status, timestamp: Date.now() });
+    return status;
 }
 
 export async function saveKycStatus(guildId, userId, newStatus) {
@@ -55,6 +74,8 @@ export async function saveKycStatus(guildId, userId, newStatus) {
     const updated = { ...current, ...newStatus };
     const key = getKycUserKey(guildId, userId);
     await setInDb(key, updated);
+    const cacheKey = `${guildId}:${userId}`;
+    kycStatusCache.set(cacheKey, { data: updated, timestamp: Date.now() });
     return updated;
 }
 
