@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { Collection } from 'discord.js';
 import { logger } from '../../utils/logger.js';
-import botConfig from '../../config/bot.js';
+import botConfig, { isCommandCategoryEnabled } from '../../config/bot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +78,11 @@ export async function loadCommands(client) {
             
             command.category = category;
             command.filePath = normalizedPath;
+            
+            if (!isCommandCategoryEnabled(category)) {
+                logger.debug(`Skipping disabled category command: ${command.data?.name || commandName} (${category})`);
+                continue;
+            }
             
             const primaryCommandName = command.data.name;
             
