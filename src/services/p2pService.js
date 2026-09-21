@@ -1180,9 +1180,27 @@ export async function sendTransactionCertificate(guild, deal) {
             return;
         }
 
-        await targetChannel.send({
+        // Collect human users involved in the deal to tag them
+        const userTags = [];
+        if (humanUserId && humanUserId !== 'server' && humanUserId !== botId && /^\d{17,20}$/.test(String(humanUserId))) {
+            userTags.push(`<@${humanUserId}>`);
+        }
+        if (deal.sellerId && deal.sellerId !== 'server' && deal.sellerId !== botId && /^\d{17,20}$/.test(String(deal.sellerId)) && !userTags.includes(`<@${deal.sellerId}>`)) {
+            userTags.push(`<@${deal.sellerId}>`);
+        }
+        if (deal.buyerId && deal.buyerId !== 'server' && deal.buyerId !== botId && /^\d{17,20}$/.test(String(deal.buyerId)) && !userTags.includes(`<@${deal.buyerId}>`)) {
+            userTags.push(`<@${deal.buyerId}>`);
+        }
+
+        const messagePayload = {
             files: [attachment]
-        });
+        };
+
+        if (userTags.length > 0) {
+            messagePayload.content = userTags.join(' ');
+        }
+
+        await targetChannel.send(messagePayload);
 
         logger.info(`[P2P] Successfully posted transaction certificate image to #${targetChannel.name} for ${traderDisplayName} (${deal.usdtAmount} USDT)`);
     } catch (err) {
