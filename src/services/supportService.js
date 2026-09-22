@@ -88,38 +88,58 @@ export async function createSupportQueryTicket(guild, member, query, client) {
         // Generate clean ticket ID
         const ticketId = Math.floor(1000 + Math.random() * 9000);
         
+        // Fetch staff role if configured
+        const { getP2PConfig } = await import('./p2pService.js');
+        const p2pConfig = await getP2PConfig(guild.id).catch(() => null);
+
+        const overwrites = [
+            {
+                id: guild.id,
+                deny: [PermissionFlagsBits.ViewChannel]
+            },
+            {
+                id: user.id,
+                allow: [
+                    PermissionFlagsBits.ViewChannel,
+                    PermissionFlagsBits.SendMessages,
+                    PermissionFlagsBits.EmbedLinks,
+                    PermissionFlagsBits.AttachFiles,
+                    PermissionFlagsBits.ReadMessageHistory
+                ]
+            },
+            {
+                id: client.user.id,
+                allow: [
+                    PermissionFlagsBits.ViewChannel,
+                    PermissionFlagsBits.SendMessages,
+                    PermissionFlagsBits.EmbedLinks,
+                    PermissionFlagsBits.AttachFiles,
+                    PermissionFlagsBits.ReadMessageHistory,
+                    PermissionFlagsBits.ManageChannels
+                ]
+            }
+        ];
+
+        if (p2pConfig?.staffRoleId) {
+            overwrites.push({
+                id: p2pConfig.staffRoleId,
+                allow: [
+                    PermissionFlagsBits.ViewChannel,
+                    PermissionFlagsBits.SendMessages,
+                    PermissionFlagsBits.EmbedLinks,
+                    PermissionFlagsBits.AttachFiles,
+                    PermissionFlagsBits.ReadMessageHistory
+                ]
+            });
+        }
+
         // Create private ticket channel
         const channelName = `🔒-query-${ticketId}`;
         const ticketChannel = await guild.channels.create({
             name: channelName,
             type: ChannelType.GuildText,
             parent: category ? category.id : null,
-            permissionOverwrites: [
-                {
-                    id: guild.id,
-                    deny: [PermissionFlagsBits.ViewChannel]
-                },
-                {
-                    id: user.id,
-                    allow: [
-                        PermissionFlagsBits.ViewChannel,
-                        PermissionFlagsBits.SendMessages,
-                        PermissionFlagsBits.EmbedLinks,
-                        PermissionFlagsBits.AttachFiles,
-                        PermissionFlagsBits.ReadMessageHistory
-                    ]
-                },
-                {
-                    id: client.user.id,
-                    allow: [
-                        PermissionFlagsBits.ViewChannel,
-                        PermissionFlagsBits.SendMessages,
-                        PermissionFlagsBits.EmbedLinks,
-                        PermissionFlagsBits.AttachFiles,
-                        PermissionFlagsBits.ReadMessageHistory
-                    ]
-                }
-            ]
+            permissionOverwrites: overwrites
         });
 
         // Register standard ticket data in database

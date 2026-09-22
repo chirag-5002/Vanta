@@ -172,19 +172,26 @@ export default {
       }
 
       // Immediately handle query ticket creation in support channel
-      if (channelName.includes('support')) {
-        const isAdmin = message.member?.permissions.has(PermissionFlagsBits.ManageMessages) || 
-                        message.member?.permissions.has(PermissionFlagsBits.ManageGuild);
-        if (!isAdmin) {
-          const userQuery = message.content;
-          await message.delete().catch(() => null);
+      const isSupportPortal = (channelName.includes('support') || 
+                               channelName.includes('help-desk') || 
+                               channelName.includes('ask-admin') ||
+                               channelName.includes('queries')) &&
+                              !channelName.includes('log') &&
+                              !channelName.includes('ticket') &&
+                              !channelName.startsWith('🔒') &&
+                              !channelName.startsWith('query-');
 
-          if (userQuery && userQuery.trim().length > 0) {
-            const { createSupportQueryTicket } = await import('../services/supportService.js');
-            await createSupportQueryTicket(message.guild, message.member, userQuery, client).catch(() => null);
-          }
-          return;
+      if (isSupportPortal) {
+        const userQuery = message.content;
+        await message.delete().catch(() => null);
+
+        if (userQuery && userQuery.trim().length > 0) {
+          const { createSupportQueryTicket } = await import('../services/supportService.js');
+          await createSupportQueryTicket(message.guild, message.member, userQuery, client).catch((err) => {
+            logger.error('Error creating support query ticket:', err);
+          });
         }
+        return;
       }
 
       // Immediately clean user clutter in report-a-user channel
