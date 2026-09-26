@@ -48,7 +48,14 @@ export async function readGuildConfig(client, guildId, context = {}) {
             return normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
         }
 
-        const rawConfig = await client.db.get(getGuildConfigKey(guildId), null);
+        const dbGetPromise = client.db.get(getGuildConfigKey(guildId), null);
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('DB_TIMEOUT'), 1500));
+        const rawConfig = await Promise.race([dbGetPromise, timeoutPromise]);
+
+        if (rawConfig === 'DB_TIMEOUT') {
+            logger.warn(`readGuildConfig timed out after 1.5s in guild ${guildId}, using default fallback`);
+            return normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
+        }
 
         if (rawConfig === null) {
             const defaultConfig = normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);

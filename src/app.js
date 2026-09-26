@@ -1,4 +1,4 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import { REST } from '@discordjs/rest';
 import express from 'express';
@@ -395,9 +395,8 @@ try {
     process.on('SIGINT', () => bot.shutdown('SIGINT'));
     
     process.on('uncaughtException', (error) => {
-      // Process state may be corrupt after an uncaught throw; log and shut down cleanly.
-      handleTaskError('uncaught_exception', error, { fatal: true });
-      bot.shutdown('UNCAUGHT_EXCEPTION');
+      logger.error('Uncaught Exception caught (keeping process active):', error);
+      handleTaskError('uncaught_exception', error, { fatal: false });
     });
 
     process.on('unhandledRejection', (reason) => {
