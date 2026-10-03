@@ -24,9 +24,9 @@ export const DEFAULT_PAYMENT_CONFIG = {
     impsIfsc: 'SBIN0001234',
     impsName: 'ICN P2P Exchange',
     cdmAccount: '998877665544 (State Bank of India)',
-    trc20Wallet: 'T9xICNUSDTTRC20OfficialWalletAddress',
-    erc20Wallet: '0x71C569ICNUSDTERC20OfficialWalletAddress',
-    bep20Wallet: '0x71C569ICNUSDTBEP20OfficialWalletAddress',
+    trc20Wallet: 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq',
+    erc20Wallet: '0x67DF4D95E8d640D530e3399E580A194E7d7C6901',
+    bep20Wallet: '0x67DF4D95E8d640D530e3399E580A194E7d7C6901',
 };
 
 // In-memory cache for P2P configs (2 min TTL)
@@ -63,18 +63,48 @@ export async function saveP2PConfig(guildId, newConfig) {
     return updated;
 }
 
+const OLD_TRC_WALLETS = new Set(['TCpRGdPLdN2bm4aRtTqHpCbEw8Uh2h2rtT', 'T9xICNUSDTTRC20OfficialWalletAddress']);
+const OLD_BEP_WALLETS = new Set(['0xB6D7277EDEC09d6C40DE43f5A0C9CD02C66a1452', '0x71C569ICNUSDTBEP20OfficialWalletAddress', '0x71C569ICNUSDTERC20OfficialWalletAddress']);
+
+/**
+ * Sanitizes and strips old wallet addresses from a payment config object.
+ */
+function sanitizePaymentConfig(config) {
+    if (!config) return config;
+    if (!config.trc20Wallet || OLD_TRC_WALLETS.has(config.trc20Wallet)) {
+        config.trc20Wallet = DEFAULT_PAYMENT_CONFIG.trc20Wallet;
+    }
+    if (!config.bep20Wallet || OLD_BEP_WALLETS.has(config.bep20Wallet)) {
+        config.bep20Wallet = DEFAULT_PAYMENT_CONFIG.bep20Wallet;
+    }
+    if (!config.erc20Wallet || OLD_BEP_WALLETS.has(config.erc20Wallet)) {
+        config.erc20Wallet = DEFAULT_PAYMENT_CONFIG.erc20Wallet;
+    }
+    return config;
+}
+
 /**
  * Retrieves payment configuration for a guild with in-memory caching.
  */
 export async function getP2PPaymentConfig(guildId) {
     if (!guildId) return { ...DEFAULT_PAYMENT_CONFIG };
     const cached = p2pPaymentCache.get(guildId);
+    let data;
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
-        return { ...DEFAULT_PAYMENT_CONFIG, ...cached.data };
+        data = cached.data;
+    } else {
+        const key = `guild:${guildId}:p2p:payments`;
+        data = await getFromDb(key, {});
     }
-    const key = `guild:${guildId}:p2p:payments`;
-    const data = await getFromDb(key, {});
-    const config = { ...DEFAULT_PAYMENT_CONFIG, ...data };
+
+    const config = sanitizePaymentConfig({ ...DEFAULT_PAYMENT_CONFIG, ...data });
+
+    // If data in DB had old addresses, persist sanitized config to DB to erase old history
+    if (guildId && (OLD_TRC_WALLETS.has(data.trc20Wallet) || OLD_BEP_WALLETS.has(data.bep20Wallet) || OLD_BEP_WALLETS.has(data.erc20Wallet))) {
+        const key = `guild:${guildId}:p2p:payments`;
+        await setInDb(key, config).catch(() => {});
+    }
+
     p2pPaymentCache.set(guildId, { data: config, timestamp: Date.now() });
     return config;
 }
@@ -85,7 +115,7 @@ export async function getP2PPaymentConfig(guildId) {
 export async function saveP2PPaymentConfig(guildId, newPayments) {
     if (!guildId) return;
     const current = await getP2PPaymentConfig(guildId);
-    const updated = { ...current, ...newPayments };
+    const updated = sanitizePaymentConfig({ ...current, ...newPayments });
     const key = `guild:${guildId}:p2p:payments`;
     await setInDb(key, updated);
     p2pPaymentCache.set(guildId, { data: updated, timestamp: Date.now() });

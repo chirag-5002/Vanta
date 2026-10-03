@@ -420,15 +420,15 @@ async function handlePaymentConfig(interaction) {
 
     if (profile === 'amit') {
         defaultUpiId = 'icn224@ibl';
-        defaultTrc20Wallet = 'TCpRGdPLdN2bm4aRtTqHpCbEw8Uh2h2rtT';
-        defaultBep20Wallet = '0xB6D7277EDEC09d6C40DE43f5A0C9CD02C66a1452';
+        defaultTrc20Wallet = 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq';
+        defaultBep20Wallet = '0x67DF4D95E8d640D530e3399E580A194E7d7C6901';
         defaultImpsAccount = '';
         defaultImpsIfsc = '';
         defaultImpsName = '';
     } else if (profile === 'naman') {
         defaultUpiId = 'innercircle20@ibl';
-        defaultTrc20Wallet = 'TCpRGdPLdN2bm4aRtTqHpCbEw8Uh2h2rtT';
-        defaultBep20Wallet = '0xB6D7277EDEC09d6C40DE43f5A0C9CD02C66a1452';
+        defaultTrc20Wallet = 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq';
+        defaultBep20Wallet = '0x67DF4D95E8d640D530e3399E580A194E7d7C6901';
         defaultImpsAccount = '4496001700126905';
         defaultImpsIfsc = 'PUNB0448600';
         defaultImpsName = 'Naman';

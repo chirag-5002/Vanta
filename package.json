@@ -7,6 +7,11 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "node src/app.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop icn-bot",
+    "pm2:restart": "pm2 restart icn-bot",
+    "pm2:logs": "pm2 logs icn-bot",
+    "pm2:status": "pm2 status",
     "migrate": "node scripts/migrate.js apply",
     "migrate:check": "node scripts/migrate.js check",
     "migrate:status": "node scripts/migrate.js status",
