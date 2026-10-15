@@ -19,11 +19,12 @@ export default {
                 .setDescription('Configures UPI ID, Bank IMPS, CDM, and Crypto Deposit Wallets for automatic dispatch.')
                 .addStringOption(option =>
                     option.setName('profile')
-                        .setDescription('Select preset profile to auto-fill (Amit/Naman)')
+                        .setDescription('Select preset profile to auto-fill (Amit/Naman/Nehul)')
                         .setRequired(false)
                         .addChoices(
                             { name: 'Amit', value: 'amit' },
-                            { name: 'Naman', value: 'naman' }
+                            { name: 'Naman', value: 'naman' },
+                            { name: 'Nehul', value: 'nehul' }
                         )
                 )
                 .addStringOption(option =>
@@ -432,6 +433,13 @@ async function handlePaymentConfig(interaction) {
         defaultImpsAccount = '4496001700126905';
         defaultImpsIfsc = 'PUNB0448600';
         defaultImpsName = 'Naman';
+    } else if (profile === 'nehul') {
+        defaultUpiId = 'innercircle26@ybl';
+        defaultTrc20Wallet = 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq';
+        defaultBep20Wallet = '0x67DF4D95E8d640D530e3399E580A194E7d7C6901';
+        defaultImpsAccount = '45396667547';
+        defaultImpsIfsc = 'SBIN0001679';
+        defaultImpsName = 'Nehul Gupta';
     }
 
     const upiId = interaction.options.getString('upi_id') ?? defaultUpiId;
