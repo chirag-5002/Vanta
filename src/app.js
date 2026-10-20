@@ -87,7 +87,18 @@ class TitanBot extends Client {
       initializeMusic(this);
       
       startupLog('Logging into Discord...');
-      await this.login(this.config.bot.token);
+      this.on('error', (err) => logger.error('Discord Client Error:', err));
+      this.on('shardError', (err, shardId) => logger.error(`Discord Shard ${shardId} Error:`, err));
+      this.on('shardDisconnect', (event, shardId) => logger.warn(`Discord Shard ${shardId} Disconnected:`, event));
+
+      const rawToken = this.config.bot.token || process.env.DISCORD_TOKEN || process.env.TOKEN || '';
+      const cleanToken = String(rawToken).trim().replace(/^["']|["']$/g, '');
+
+      if (!cleanToken) {
+        throw new Error('No Discord bot token provided! Please check DISCORD_TOKEN environment variable in Render.');
+      }
+
+      await this.login(cleanToken);
       startupLog('Discord login successful');
       
       startupLog('Registering slash commands globally...');
