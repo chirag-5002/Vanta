@@ -14,124 +14,9 @@ export const p2pTradeButtonHandler = {
         const kycType = args[1] || 'kyc';
         const isBuy = tradeType === 'buy';
 
-        // 1. Instant Time Restriction Check (11 PM to 9 AM Kolkata timezone) - 0ms
-        const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Kolkata',
-            hour: 'numeric',
-            hourCycle: 'h23',
-        }).format(new Date());
-        const hour = parseInt(kolkataTimeStr, 10);
-        if (hour >= 23 || hour < 9) {
-            await interaction.reply({
-                content: `⚠️ **We are not doing transactions between 11pm and 9am.**\n*This message will automatically disappear in 5 minutes.*`,
-                flags: MessageFlags.Ephemeral
-            });
-
-            setTimeout(async () => {
-                try {
-                    await interaction.deleteReply();
-                } catch (e) {
-                    // Ignore errors
-                }
-            }, 5 * 60 * 1000);
-            return;
-        }
-
-        // 2. Parallel check for config, ban status, daily limits, and KYC (capped at 800ms to guarantee instant Discord modal)
-        const today = new Date().toISOString().split('T')[0];
-        const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${interaction.user.id}:${today}`;
-        const userStatsKey = getP2PUserStatsKey(interaction.guildId, interaction.user.id);
-
-        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 800));
-        const fetchChecks = Promise.all([
-            getP2PConfig(interaction.guildId).catch(() => DEFAULT_P2P_CONFIG),
-            getFromDb(`guild:${interaction.guildId}:p2p:ban_until:${interaction.user.id}`, 0).catch(() => 0),
-            getFromDb(dailyTicketsKey, 0).catch(() => 0),
-            (kycType === 'kyc' ? getKycStatus(interaction.guildId, interaction.user.id) : Promise.resolve({ status: 'verified' })).catch(() => ({ status: 'verified' })),
-            getFromDb(userStatsKey, { completedDeals: 0 }).catch(() => ({ completedDeals: 0 }))
-        ]);
-
-        const results = await Promise.race([fetchChecks, timeoutPromise]);
-        const config = results?.[0] || DEFAULT_P2P_CONFIG;
-        const banUntil = results?.[1] || 0;
-        const dailyCount = results?.[2] || 0;
-        const kycStatus = results?.[3] || { status: 'verified' };
-        const stats = results?.[4] || { completedDeals: 0 };
-
-        if (config?.disabled) {
-            return await interaction.reply({
-                content: `❌ **We are not doing any transactions right now. Soon we will operate.**`,
-                flags: MessageFlags.Ephemeral
-            });
-        }
-
-        if (isBuy && config?.buyDisabled) {
-            return await interaction.reply({
-                content: `❌ **Buy transactions are currently offline. Soon we will operate.**`,
-                flags: MessageFlags.Ephemeral
-            });
-        }
-
-        if (!isBuy && config?.sellDisabled) {
-            return await interaction.reply({
-                content: `❌ **Sell transactions are currently offline. Soon we will operate.**`,
-                flags: MessageFlags.Ephemeral
-            });
-        }
-
-        // Check if user is P2P banned
-        if (banUntil && Date.now() < banUntil) {
-            const expiresTimestamp = Math.floor(banUntil / 1000);
-            return await interaction.reply({
-                content: `❌ **You are currently banned from using the P2P Buy/Sell systems.**\n\n**Reason:** Created multiple P2P tickets without completing payments/transactions (Timepass).\n**Banned Until:** <t:${expiresTimestamp}:F> (<t:${expiresTimestamp}:R>)`,
-                flags: MessageFlags.Ephemeral
-            });
-        }
-
-        // Check daily P2P ticket limit (Max 3/day)
-        if (dailyCount >= 3) {
-            const completedDeals = stats?.completedDeals || 0;
-
-            if (completedDeals === 0) {
-                return await interaction.reply({
-                    content: `❌ **Limit Exceeded:** You can create a maximum of **3 P2P tickets** (Buy/Sell combined) per day.\n\nYou have already created ${dailyCount} tickets today. Please try again tomorrow.`,
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-        }
-
-        // KYC check if required
-        if (kycType === 'kyc' && kycStatus.status !== 'verified') {
-            const statusLabel = kycStatus.status === 'pending' ? '⏳ Pending Review' : kycStatus.status === 'rejected' ? '❌ Rejected' : 'Not Started';
-            const embed = new EmbedBuilder()
-                .setTitle('🔒 KYC Verification Required')
-                .setDescription(
-                    `To trade with KYC on this server, you must complete identity verification first.\n\n` +
-                    `• **Current Status:** \`${statusLabel}\`\n` +
-                    (kycStatus.status === 'rejected' ? `• **Reason:** \`${kycStatus.rejectionReason}\`\n\n` : '\n') +
-                    `Please click the button below to start your one-time verification.`
-                )
-                .setColor('#FFC107');
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('kyc_start_verification')
-                    .setLabel('🔒 Start KYC Verification')
-                    .setStyle(ButtonStyle.Success)
-            );
-
-            return await interaction.reply({
-                embeds: [embed],
-                components: [row],
-                flags: MessageFlags.Ephemeral
-            });
-        }
-
         // Clear any previous wizard state
         const key = `${interaction.guildId}:${interaction.user.id}`;
         wizardSelections.delete(key);
-
-        const minLimit = config?.minTradeAmount !== undefined ? config.minTradeAmount : 50;
 
         const modal = new ModalBuilder()
             .setCustomId(`p2p_amount_modal:${tradeType}:${kycType}`)
@@ -139,13 +24,13 @@ export const p2pTradeButtonHandler = {
 
         const amountInput = new TextInputBuilder()
             .setCustomId('q1_amount')
-            .setLabel(`How much USDT to ${isBuy ? 'BUY' : 'SELL'}? (Min. ${minLimit})`)
-            .setPlaceholder(`Minimum ${minLimit} USDT (e.g. ${minLimit + 50}, ${minLimit + 450})`)
+            .setLabel(`How much USDT to ${isBuy ? 'BUY' : 'SELL'}? (Min. 50)`)
+            .setPlaceholder('Minimum 50 USDT (e.g. 100, 500)')
             .setStyle(TextInputStyle.Short)
             .setRequired(true);
 
         modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
-        await interaction.showModal(modal);
+        return await interaction.showModal(modal);
     }
 };
 
