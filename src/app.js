@@ -221,6 +221,18 @@ class TitanBot extends Client {
       });
     });
 
+    app.get('/debug-bot', (req, res) => {
+      res.status(200).json({
+        wsStatus: this.ws?.status ?? -1,
+        wsPing: this.ws?.ping ?? -1,
+        isReady: this.isReady(),
+        guildCount: this.guilds?.cache?.size ?? 0,
+        user: this.user ? this.user.tag : null,
+        tokenLength: (process.env.DISCORD_TOKEN || process.env.TOKEN || '').trim().length,
+        clientId: process.env.CLIENT_ID || null
+      });
+    });
+
     const startServer = (port, attempt = 0) => {
       let hasStartedListening = false;
       const server = app.listen(port, host, () => {
