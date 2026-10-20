@@ -49,6 +49,7 @@ function withTraceContext(context = {}, traceContext = {}) {
 export default {
   name: Events.InteractionCreate,
   async execute(interaction, client) {
+    console.log(`[DEBUG INTERACTION] Received -> Type: ${interaction.type}, isCommand: ${interaction.isChatInputCommand?.()}, command: ${interaction.commandName || 'none'}, customId: ${interaction.customId || 'none'}, user: ${interaction.user?.tag}`);
     const interactionTraceContext = createInteractionTraceContext(interaction);
     interaction.traceContext = interactionTraceContext;
     interaction.traceId = interactionTraceContext.traceId;
