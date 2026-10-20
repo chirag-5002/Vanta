@@ -2,7 +2,7 @@ import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, Strin
 import { wizardSelections } from '../../selectMenus/p2p/p2pWizardSelect.js';
 import { getFromDb, getP2PUserStatsKey } from '../../../utils/database.js';
 import { logger } from '../../../utils/logger.js';
-import { getP2PConfig } from '../../../services/p2pService.js';
+import { getP2PConfig, DEFAULT_P2P_CONFIG } from '../../../services/p2pService.js';
 import { getKycStatus } from '../../../services/kycService.js';
 
 // ==================== STEP 1: Show Amount Modal ====================
@@ -37,23 +37,26 @@ export const p2pTradeButtonHandler = {
             return;
         }
 
-        // 2. Parallel check for config, ban status, daily limits, and KYC
+        // 2. Parallel check for config, ban status, daily limits, and KYC (capped at 800ms to guarantee instant Discord modal)
         const today = new Date().toISOString().split('T')[0];
         const dailyTicketsKey = `guild:${interaction.guildId}:p2p:daily_tickets:${interaction.user.id}:${today}`;
+        const userStatsKey = getP2PUserStatsKey(interaction.guildId, interaction.user.id);
 
-        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 1500));
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 800));
         const fetchChecks = Promise.all([
-            getP2PConfig(interaction.guildId),
-            getFromDb(`guild:${interaction.guildId}:p2p:ban_until:${interaction.user.id}`, 0),
-            getFromDb(dailyTicketsKey, 0),
-            kycType === 'kyc' ? getKycStatus(interaction.guildId, interaction.user.id) : Promise.resolve({ status: 'verified' })
+            getP2PConfig(interaction.guildId).catch(() => DEFAULT_P2P_CONFIG),
+            getFromDb(`guild:${interaction.guildId}:p2p:ban_until:${interaction.user.id}`, 0).catch(() => 0),
+            getFromDb(dailyTicketsKey, 0).catch(() => 0),
+            (kycType === 'kyc' ? getKycStatus(interaction.guildId, interaction.user.id) : Promise.resolve({ status: 'verified' })).catch(() => ({ status: 'verified' })),
+            getFromDb(userStatsKey, { completedDeals: 0 }).catch(() => ({ completedDeals: 0 }))
         ]);
 
         const results = await Promise.race([fetchChecks, timeoutPromise]);
-        const config = results?.[0] || await getP2PConfig(interaction.guildId);
+        const config = results?.[0] || DEFAULT_P2P_CONFIG;
         const banUntil = results?.[1] || 0;
         const dailyCount = results?.[2] || 0;
         const kycStatus = results?.[3] || { status: 'verified' };
+        const stats = results?.[4] || { completedDeals: 0 };
 
         if (config?.disabled) {
             return await interaction.reply({
@@ -87,8 +90,6 @@ export const p2pTradeButtonHandler = {
 
         // Check daily P2P ticket limit (Max 3/day)
         if (dailyCount >= 3) {
-            const userStatsKey = getP2PUserStatsKey(interaction.guildId, interaction.user.id);
-            const stats = await getFromDb(userStatsKey, { completedDeals: 0 });
             const completedDeals = stats?.completedDeals || 0;
 
             if (completedDeals === 0) {
