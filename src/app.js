@@ -233,6 +233,20 @@ class TitanBot extends Client {
       });
     });
 
+    app.get('/test-discord-rest', async (req, res) => {
+      try {
+        const token = (process.env.DISCORD_TOKEN || process.env.TOKEN || '').trim().replace(/^["']|["']$/g, '');
+        const response = await fetch('https://discord.com/api/v10/users/@me', {
+          headers: { Authorization: `Bot ${token}` }
+        });
+        const status = response.status;
+        const text = await response.text();
+        res.status(200).json({ status, body: text });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
     const startServer = (port, attempt = 0) => {
       let hasStartedListening = false;
       const server = app.listen(port, host, () => {
