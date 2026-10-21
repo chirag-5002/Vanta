@@ -6,6 +6,27 @@ import { pgConfig } from "./database/postgres.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Sanitize DISCORD_TOKEN in case multiple env lines were pasted into Railway's single variable field
+const rawEnvToken = process.env.DISCORD_TOKEN || process.env.TOKEN || '';
+let cleanEnvToken = String(rawEnvToken).trim().replace(/^["']|["']$/g, '');
+let extractedGuildId = process.env.GUILD_ID;
+let extractedClientId = process.env.CLIENT_ID;
+
+if (cleanEnvToken.includes('\n') || cleanEnvToken.includes('\r')) {
+  const lines = cleanEnvToken.split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    if (/^GUILD_ID\s*=/i.test(line)) {
+      extractedGuildId = extractedGuildId || line.split('=')[1]?.trim();
+      process.env.GUILD_ID = extractedGuildId;
+    } else if (/^CLIENT_ID\s*=/i.test(line)) {
+      extractedClientId = extractedClientId || line.split('=')[1]?.trim();
+      process.env.CLIENT_ID = extractedClientId;
+    } else if (line.length > 25 && !line.includes('=')) {
+      cleanEnvToken = line.replace(/^["']|["']$/g, '');
+    }
+  }
+}
+
 const appConfig = {
   paths: {
     root: path.join(__dirname, "../.."),
@@ -20,10 +41,10 @@ const appConfig = {
 
   bot: {
     ...botConfig,
-    token: process.env.DISCORD_TOKEN || process.env.TOKEN,
-    clientId: process.env.CLIENT_ID,
+    token: cleanEnvToken,
+    clientId: extractedClientId,
     // Retained for tutorial/setup compatibility; not used for command registration.
-    guildId: process.env.GUILD_ID,
+    guildId: extractedGuildId,
 
     shop: {
       ...botConfig.shop,

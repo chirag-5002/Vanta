@@ -92,7 +92,11 @@ class TitanBot extends Client {
       this.on('shardDisconnect', (event, shardId) => logger.warn(`Discord Shard ${shardId} Disconnected:`, event));
 
       const rawToken = this.config.bot.token || process.env.DISCORD_TOKEN || process.env.TOKEN || '';
-      const cleanToken = String(rawToken).trim().replace(/^["']|["']$/g, '');
+      let cleanToken = String(rawToken).trim().replace(/^["']|["']$/g, '');
+      if (cleanToken.includes('\n') || cleanToken.includes('\r')) {
+        const lines = cleanToken.split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
+        cleanToken = (lines.find(l => l.length > 25 && !l.includes('=')) || lines[0] || '').replace(/^["']|["']$/g, '');
+      }
 
       if (!cleanToken) {
         console.error('==================== [CRITICAL ERROR] ====================');
