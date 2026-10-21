@@ -62,6 +62,11 @@ export function resolveSslConfig() {
         return { rejectUnauthorized: false };
     }
 
+    // Railway internal private network (e.g. postgres.railway.internal) and localhost do NOT support SSL
+    if (url.includes('railway.internal') || url.includes('.internal') || url.includes('localhost') || url.includes('127.0.0.1')) {
+        return false;
+    }
+
     if (process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID) {
         return { rejectUnauthorized: false };
     }
@@ -98,11 +103,11 @@ export function resolvePostgresPoolConfig() {
     }
 
     return {
-        host: process.env.POSTGRES_HOST || 'localhost',
-        port: parseInt(process.env.POSTGRES_PORT) || 5432,
-        database: process.env.POSTGRES_DB || 'titanbot',
-        user: process.env.POSTGRES_USER || 'postgres',
-        password: (process.env.POSTGRES_PASSWORD || '').toString(),
+        host: process.env.POSTGRES_HOST || process.env.PGHOST || 'localhost',
+        port: parseInt(process.env.POSTGRES_PORT || process.env.PGPORT) || 5432,
+        database: process.env.POSTGRES_DB || process.env.PGDATABASE || 'titanbot',
+        user: process.env.POSTGRES_USER || process.env.PGUSER || 'postgres',
+        password: (process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD || '').toString(),
         ...sharedOptions,
     };
 }
@@ -112,11 +117,11 @@ export const pgConfig = {
     
     options: {
         
-        host: process.env.POSTGRES_HOST || 'localhost',
-        port: parseInt(process.env.POSTGRES_PORT) || 5432,
-        database: process.env.POSTGRES_DB || 'titanbot',
-        user: process.env.POSTGRES_USER || 'postgres',
-        password: (process.env.POSTGRES_PASSWORD || '').toString(),
+        host: process.env.POSTGRES_HOST || process.env.PGHOST || 'localhost',
+        port: parseInt(process.env.POSTGRES_PORT || process.env.PGPORT) || 5432,
+        database: process.env.POSTGRES_DB || process.env.PGDATABASE || 'titanbot',
+        user: process.env.POSTGRES_USER || process.env.PGUSER || 'postgres',
+        password: (process.env.POSTGRES_PASSWORD || process.env.PGPASSWORD || '').toString(),
         ssl: resolveSslConfig(),
 
         max: parseInt(process.env.POSTGRES_MAX_CONNECTIONS) || 20,

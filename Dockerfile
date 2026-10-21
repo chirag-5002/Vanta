@@ -2,6 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /usr/src/app
 
+RUN mkdir -p logs
+
 ENV NODE_ENV=production
 
 COPY package*.json ./

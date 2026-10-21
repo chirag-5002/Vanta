@@ -95,11 +95,43 @@ class TitanBot extends Client {
       const cleanToken = String(rawToken).trim().replace(/^["']|["']$/g, '');
 
       if (!cleanToken) {
-        throw new Error('No Discord bot token provided! Please check DISCORD_TOKEN environment variable in Render.');
+        console.error('==================== [CRITICAL ERROR] ====================');
+        console.error('❌ DISCORD_TOKEN is missing!');
+        console.error('👉 You need to add DISCORD_TOKEN to your Railway service variables:');
+        console.error('   1. Go to Railway -> Your Project -> Click on this service');
+        console.error('   2. Open the "Variables" tab');
+        console.error('   3. Add DISCORD_TOKEN with your bot token from Discord Developer Portal');
+        console.error('   4. Add CLIENT_ID with your bot application ID');
+        console.error('==========================================================');
+        throw new Error('No Discord bot token provided! Please check DISCORD_TOKEN environment variable in Railway.');
       }
 
-      await this.login(cleanToken);
-      startupLog('Discord login successful');
+      try {
+        await this.login(cleanToken);
+        startupLog('Discord login successful');
+      } catch (loginErr) {
+        console.error('================ [DISCORD LOGIN FAILED] ================');
+        console.error(`Error message: ${loginErr.message}`);
+        if (loginErr.code) console.error(`Error code: ${loginErr.code}`);
+
+        if (loginErr.code === 'DisallowedIntents' || loginErr.message?.toLowerCase().includes('disallowed intents')) {
+          console.error('👉 CAUSE: Privileged Gateway Intents are disabled in your Discord App!');
+          console.error('👉 FIX:');
+          console.error('   1. Go to https://discord.com/developers/applications');
+          console.error('   2. Select your application -> Click "Bot" in the left sidebar');
+          console.error('   3. Scroll down to "Privileged Gateway Intents"');
+          console.error('   4. Turn ON: "SERVER MEMBERS INTENT"');
+          console.error('   5. Turn ON: "MESSAGE CONTENT INTENT"');
+          console.error('   6. Save changes and redeploy or restart the bot.');
+        } else if (loginErr.code === 'TokenInvalid' || loginErr.message?.toLowerCase().includes('invalid token')) {
+          console.error('👉 CAUSE: The DISCORD_TOKEN provided in Railway Variables is invalid or expired.');
+          console.error('👉 FIX: Go to Discord Developer Portal -> Bot -> Reset Token -> Copy and paste the new token into Railway Variables.');
+        } else {
+          console.error('👉 Check your network connectivity or Discord service status.');
+        }
+        console.error('========================================================');
+        throw loginErr;
+      }
       
       startupLog('Registering slash commands globally...');
       await this.registerCommands();
