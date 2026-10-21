@@ -481,39 +481,32 @@ export const botConfig = {
 export function validateConfig(config) {
   const errors = [];
 
-  if (process.env.NODE_ENV !== 'production') {
-    logger.debug('Environment variables check:');
-    logger.debug('DISCORD_TOKEN exists:', !!process.env.DISCORD_TOKEN);
-    logger.debug('TOKEN exists:', !!process.env.TOKEN);
-    logger.debug('CLIENT_ID exists:', !!process.env.CLIENT_ID);
-    logger.debug('GUILD_ID exists:', !!process.env.GUILD_ID);
-    logger.debug('POSTGRES_HOST exists:', !!process.env.POSTGRES_HOST);
-    logger.debug('NODE_ENV:', process.env.NODE_ENV);
+  const rawToken = process.env.DISCORD_TOKEN || process.env.TOKEN || '';
+  const cleanToken = String(rawToken).trim().replace(/^["']|["']$/g, '');
+  if (!cleanToken) {
+    errors.push("Bot token is required: set DISCORD_TOKEN or TOKEN in Railway Variables");
   }
 
-  if (!process.env.DISCORD_TOKEN && !process.env.TOKEN) {
-    errors.push("Bot token is required (DISCORD_TOKEN or TOKEN environment variable)");
+  const cleanClientId = String(process.env.CLIENT_ID || '').trim().replace(/^["']|["']$/g, '');
+  if (!cleanClientId) {
+    errors.push("Client ID is required: set CLIENT_ID in Railway Variables");
   }
 
-  if (!process.env.CLIENT_ID) {
-    errors.push("Client ID is required (CLIENT_ID environment variable)");
-  }
+  const hasConnectionUrl = Boolean(
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL ||
+    process.env.DATABASE_PUBLIC_URL ||
+    process.env.DATABASE_PRIVATE_URL
+  );
 
-  if (process.env.NODE_ENV === 'production') {
-    // A full connection URL (DATABASE_URL / POSTGRES_URL) satisfies all Postgres
-    // requirements, matching how src/config/database/postgres.js resolves the pool config.
-    const hasConnectionUrl = Boolean(process.env.POSTGRES_URL || process.env.DATABASE_URL);
+  const hasHost = Boolean(process.env.POSTGRES_HOST || process.env.PGHOST);
+  const hasUser = Boolean(process.env.POSTGRES_USER || process.env.PGUSER);
+  const hasPassword = Boolean(process.env.POSTGRES_PASSWORD !== undefined || process.env.PGPASSWORD !== undefined);
 
-    if (!hasConnectionUrl) {
-      if (!process.env.POSTGRES_HOST) {
-        errors.push("PostgreSQL connection is required in production (set DATABASE_URL/POSTGRES_URL, or POSTGRES_HOST)");
-      }
-      if (!process.env.POSTGRES_USER) {
-        errors.push("PostgreSQL user is required in production (set DATABASE_URL/POSTGRES_URL, or POSTGRES_USER)");
-      }
-      if (!process.env.POSTGRES_PASSWORD) {
-        errors.push("PostgreSQL password is required in production (set DATABASE_URL/POSTGRES_URL, or POSTGRES_PASSWORD)");
-      }
+  if (!hasConnectionUrl && (!hasHost || !hasUser || !hasPassword)) {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('⚠️ PostgreSQL configuration not fully provided (DATABASE_URL, POSTGRES_URL, or PGHOST/PGUSER).');
+      console.warn('⚠️ Bot will initialize in Degraded Mode (In-Memory fallback storage).');
     }
   }
 
@@ -522,7 +515,13 @@ export function validateConfig(config) {
 
 const configErrors = validateConfig(botConfig);
 if (configErrors.length > 0) {
-  logger.error("Bot configuration errors:", configErrors.join("\n"));
+  console.error("==================== BOT CONFIGURATION ERROR ====================");
+  for (const err of configErrors) {
+    console.error(`❌ ${err}`);
+  }
+  console.error("👉 Please add the missing variables in Railway -> Variables tab.");
+  console.error("=================================================================");
+  logger.error(`Bot configuration errors:\n${configErrors.join("\n")}`);
   if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
