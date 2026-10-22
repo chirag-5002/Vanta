@@ -18,14 +18,14 @@ export const DEFAULT_P2P_CONFIG = {
 };
 
 export const DEFAULT_PAYMENT_CONFIG = {
-    upiId: 'icn@upi',
+    upiId: 'amitsalianjk24-1@okaxis',
     upiQrUrl: null,
-    impsAccount: '998877665544',
-    impsIfsc: 'SBIN0001234',
-    impsName: 'ICN P2P Exchange',
-    cdmAccount: '998877665544 (State Bank of India)',
+    impsAccount: null,
+    impsIfsc: null,
+    impsName: null,
+    cdmAccount: null,
     trc20Wallet: 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq',
-    erc20Wallet: '0x67DF4D95E8d640D530e3399E580A194E7d7C6901',
+    erc20Wallet: null,
     bep20Wallet: '0x67DF4D95E8d640D530e3399E580A194E7d7C6901',
 };
 
@@ -65,9 +65,12 @@ export async function saveP2PConfig(guildId, newConfig) {
 
 const OLD_TRC_WALLETS = new Set(['TCpRGdPLdN2bm4aRtTqHpCbEw8Uh2h2rtT', 'T9xICNUSDTTRC20OfficialWalletAddress']);
 const OLD_BEP_WALLETS = new Set(['0xB6D7277EDEC09d6C40DE43f5A0C9CD02C66a1452', '0x71C569ICNUSDTBEP20OfficialWalletAddress', '0x71C569ICNUSDTERC20OfficialWalletAddress']);
+const OLD_DEMO_UPIS = new Set(['icn@upi', 'innercircle20@ibl', 'icn224@ibl']);
+const OLD_DEMO_IMPS = new Set(['998877665544', '4496001700126905']);
+const OLD_DEMO_CDM = new Set(['998877665544 (State Bank of India)']);
 
 /**
- * Sanitizes and strips old wallet addresses from a payment config object.
+ * Sanitizes and strips old wallet addresses and demo data from a payment config object.
  */
 function sanitizePaymentConfig(config) {
     if (!config) return config;
@@ -77,8 +80,19 @@ function sanitizePaymentConfig(config) {
     if (!config.bep20Wallet || OLD_BEP_WALLETS.has(config.bep20Wallet)) {
         config.bep20Wallet = DEFAULT_PAYMENT_CONFIG.bep20Wallet;
     }
-    if (!config.erc20Wallet || OLD_BEP_WALLETS.has(config.erc20Wallet)) {
-        config.erc20Wallet = DEFAULT_PAYMENT_CONFIG.erc20Wallet;
+    if (OLD_BEP_WALLETS.has(config.erc20Wallet)) {
+        config.erc20Wallet = null;
+    }
+    if (!config.upiId || OLD_DEMO_UPIS.has(config.upiId)) {
+        config.upiId = DEFAULT_PAYMENT_CONFIG.upiId;
+    }
+    if (OLD_DEMO_IMPS.has(config.impsAccount)) {
+        config.impsAccount = DEFAULT_PAYMENT_CONFIG.impsAccount;
+        config.impsIfsc = DEFAULT_PAYMENT_CONFIG.impsIfsc;
+        config.impsName = DEFAULT_PAYMENT_CONFIG.impsName;
+    }
+    if (OLD_DEMO_CDM.has(config.cdmAccount)) {
+        config.cdmAccount = null;
     }
     return config;
 }
@@ -99,8 +113,15 @@ export async function getP2PPaymentConfig(guildId) {
 
     const config = sanitizePaymentConfig({ ...DEFAULT_PAYMENT_CONFIG, ...data });
 
-    // If data in DB had old addresses, persist sanitized config to DB to erase old history
-    if (guildId && (OLD_TRC_WALLETS.has(data.trc20Wallet) || OLD_BEP_WALLETS.has(data.bep20Wallet) || OLD_BEP_WALLETS.has(data.erc20Wallet))) {
+    // If data in DB had old addresses or demo data, persist sanitized config to DB to erase old history
+    if (guildId && (
+        OLD_TRC_WALLETS.has(data.trc20Wallet) ||
+        OLD_BEP_WALLETS.has(data.bep20Wallet) ||
+        OLD_BEP_WALLETS.has(data.erc20Wallet) ||
+        OLD_DEMO_UPIS.has(data.upiId) ||
+        OLD_DEMO_IMPS.has(data.impsAccount) ||
+        OLD_DEMO_CDM.has(data.cdmAccount)
+    )) {
         const key = `guild:${guildId}:p2p:payments`;
         await setInDb(key, config).catch(() => {});
     }

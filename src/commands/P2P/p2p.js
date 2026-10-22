@@ -19,11 +19,10 @@ export default {
                 .setDescription('Configures UPI ID, Bank IMPS, CDM, and Crypto Deposit Wallets for automatic dispatch.')
                 .addStringOption(option =>
                     option.setName('profile')
-                        .setDescription('Select preset profile to auto-fill (Amit/Naman/Nehul)')
+                        .setDescription('Select preset profile to auto-fill (Amit/Nehul)')
                         .setRequired(false)
                         .addChoices(
                             { name: 'Amit', value: 'amit' },
-                            { name: 'Naman', value: 'naman' },
                             { name: 'Nehul', value: 'nehul' }
                         )
                 )
@@ -426,13 +425,6 @@ async function handlePaymentConfig(interaction) {
         defaultImpsAccount = '';
         defaultImpsIfsc = '';
         defaultImpsName = '';
-    } else if (profile === 'naman') {
-        defaultUpiId = 'innercircle20@ibl';
-        defaultTrc20Wallet = 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq';
-        defaultBep20Wallet = '0x67DF4D95E8d640D530e3399E580A194E7d7C6901';
-        defaultImpsAccount = '4496001700126905';
-        defaultImpsIfsc = 'PUNB0448600';
-        defaultImpsName = 'Naman';
     } else if (profile === 'nehul') {
         defaultUpiId = 'innercircle26@ybl';
         defaultTrc20Wallet = 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq';
@@ -470,12 +462,12 @@ async function handlePaymentConfig(interaction) {
                 infoEmbed(
                     'P2P Payment & Deposit Wallet Configuration',
                     `**Configured Automated Accounts:**\n` +
-                    `• **UPI ID:** \`${current.upiId}\`\n` +
-                    `• **IMPS Bank Account:** \`${current.impsAccount}\` (IFSC: \`${current.impsIfsc}\` - \`${current.impsName}\`)\n` +
-                    `• **CDM Account:** \`${current.cdmAccount}\`\n` +
-                    `• **TRC20 Deposit Wallet:** \`${current.trc20Wallet}\`\n` +
-                    `• **ERC20 Deposit Wallet:** \`${current.erc20Wallet}\`\n` +
-                    `• **BEP20 Deposit Wallet:** \`${current.bep20Wallet}\`\n\n` +
+                    `• **UPI ID:** \`${current.upiId || 'Not Configured'}\`\n` +
+                    (current.impsAccount ? `• **IMPS Bank Account:** \`${current.impsAccount}\` (IFSC: \`${current.impsIfsc}\` - \`${current.impsName}\`)\n` : '') +
+                    (current.cdmAccount ? `• **CDM Account:** \`${current.cdmAccount}\`\n` : '') +
+                    `• **TRC20 Deposit Wallet:** \`${current.trc20Wallet || 'Not Configured'}\`\n` +
+                    (current.erc20Wallet ? `• **ERC20 Deposit Wallet:** \`${current.erc20Wallet}\`\n` : '') +
+                    `• **BEP20 Deposit Wallet:** \`${current.bep20Wallet || 'Not Configured'}\`\n\n` +
                     `Use options in \`/p2p payments\` to update any of these details.`
                 )
             ]
