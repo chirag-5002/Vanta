@@ -420,7 +420,7 @@ async function handlePaymentConfig(interaction) {
     let defaultImpsName = null;
 
     if (profile === 'amit') {
-        defaultUpiId = 'icn224@ibl';
+        defaultUpiId = 'amitsalianjk24-1@okaxis';
         defaultTrc20Wallet = 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq';
         defaultBep20Wallet = '0x67DF4D95E8d640D530e3399E580A194E7d7C6901';
         defaultImpsAccount = '';
