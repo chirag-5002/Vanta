@@ -8,16 +8,59 @@ export const wizardSelections = new Map();
 /**
  * Builds the interaction components with correct defaults set based on user selections.
  */
-export function buildWizardComponents(tradeType, kycType, selectedPayment = null, selectedNetwork = null, config = null) {
+export function buildWizardComponents(tradeType, kycType, selectedPayment = null, selectedNetwork = null, config = null, amountVal = null, dailyOnlineSpent = 0) {
     const isBuy = tradeType === 'buy';
 
-    // Payment Method Options
-    const paymentOptions = [
-        { label: 'UPI', value: 'UPI', emoji: '📱' },
-    ];
+    let paymentOptions = [];
 
-    if (!config || config.impsAccount) {
-        paymentOptions.push({ label: 'IMPS', value: 'IMPS', emoji: '🏦' });
+    if (isBuy) {
+        const isOver250 = (amountVal !== null && amountVal > 250);
+        const wouldExceedDaily = (amountVal !== null && (dailyOnlineSpent + amountVal > 250));
+
+        if (isOver250 || wouldExceedDaily) {
+            // Buy > 250 USDT or daily online limit (250 USDT) exceeded: ONLY CDM allowed!
+            paymentOptions = [
+                {
+                    label: 'CDM (Cash Deposit Machine)',
+                    value: 'CDM',
+                    emoji: '🏧',
+                    description: isOver250 ? 'Mandatory for transactions > 250 USDT' : 'Daily online limit (250 USDT) reached'
+                }
+            ];
+            // Auto-select CDM
+            if (!selectedPayment) {
+                selectedPayment = 'CDM';
+            }
+        } else {
+            // Under 250 USDT and within daily online limit: UPI & IMPS available
+            const remainingDaily = Math.max(0, 250 - dailyOnlineSpent);
+            paymentOptions = [
+                {
+                    label: 'UPI',
+                    value: 'UPI',
+                    emoji: '📱',
+                    description: `Daily Limit: ${remainingDaily.toFixed(0)} USDT remaining`
+                },
+            ];
+
+            if (!config || config.impsAccount) {
+                paymentOptions.push({
+                    label: 'IMPS',
+                    value: 'IMPS',
+                    emoji: '🏦',
+                    description: `Daily Limit: ${remainingDaily.toFixed(0)} USDT remaining`
+                });
+            }
+        }
+    } else {
+        // Sell USDT: User chooses payout method
+        paymentOptions = [
+            { label: 'UPI', value: 'UPI', emoji: '📱' },
+        ];
+
+        if (!config || config.impsAccount) {
+            paymentOptions.push({ label: 'IMPS', value: 'IMPS', emoji: '🏦' });
+        }
     }
 
     // Set default value if selected
@@ -97,7 +140,15 @@ export const selectPaymentHandler = {
 
         // Rebuild components to show default selection in select menu
         const config = await getP2PPaymentConfig(interaction.guildId);
-        const updatedComponents = buildWizardComponents(tradeType, kycType, existing.paymentMethod, existing.network, config);
+        const updatedComponents = buildWizardComponents(
+            tradeType,
+            kycType,
+            existing.paymentMethod,
+            existing.network,
+            config,
+            existing.amountVal,
+            existing.dailyOnlineSpent || 0
+        );
 
         await interaction.update({
             content: status,
@@ -141,7 +192,15 @@ export const selectNetworkHandler = {
 
         // Rebuild components to show default selection in select menu
         const config = await getP2PPaymentConfig(interaction.guildId);
-        const updatedComponents = buildWizardComponents(tradeType, kycType, existing.paymentMethod, existing.network, config);
+        const updatedComponents = buildWizardComponents(
+            tradeType,
+            kycType,
+            existing.paymentMethod,
+            existing.network,
+            config,
+            existing.amountVal,
+            existing.dailyOnlineSpent || 0
+        );
 
         await interaction.update({
             content: status,

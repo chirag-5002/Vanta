@@ -53,7 +53,22 @@ export default {
                 )
                 .addStringOption(option =>
                     option.setName('cdm_account')
-                        .setDescription('CDM Cash Deposit Account Details')
+                        .setDescription('CDM Cash Deposit Account Number')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('cdm_bank')
+                        .setDescription('CDM Bank Name (e.g. State Bank of India)')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('cdm_ifsc')
+                        .setDescription('CDM Bank IFSC Code')
+                        .setRequired(false)
+                )
+                .addStringOption(option =>
+                    option.setName('cdm_name')
+                        .setDescription('CDM Account Holder Name')
                         .setRequired(false)
                 )
                 .addStringOption(option =>
@@ -417,6 +432,10 @@ async function handlePaymentConfig(interaction) {
     let defaultImpsAccount = null;
     let defaultImpsIfsc = null;
     let defaultImpsName = null;
+    let defaultCdmAccount = null;
+    let defaultCdmBank = null;
+    let defaultCdmIfsc = null;
+    let defaultCdmName = null;
 
     if (profile === 'amit') {
         defaultUpiId = 'amitsalianjk24-1@okaxis';
@@ -425,6 +444,10 @@ async function handlePaymentConfig(interaction) {
         defaultImpsAccount = '';
         defaultImpsIfsc = '';
         defaultImpsName = '';
+        defaultCdmAccount = '45396667547';
+        defaultCdmBank = 'State Bank of India';
+        defaultCdmIfsc = 'SBIN0001679';
+        defaultCdmName = 'Nehul Gupta';
     } else if (profile === 'nehul') {
         defaultUpiId = 'innercircle26@ybl';
         defaultTrc20Wallet = 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq';
@@ -432,6 +455,10 @@ async function handlePaymentConfig(interaction) {
         defaultImpsAccount = '45396667547';
         defaultImpsIfsc = 'SBIN0001679';
         defaultImpsName = 'Nehul Gupta';
+        defaultCdmAccount = '45396667547';
+        defaultCdmBank = 'State Bank of India';
+        defaultCdmIfsc = 'SBIN0001679';
+        defaultCdmName = 'Nehul Gupta';
     }
 
     const upiId = interaction.options.getString('upi_id') ?? defaultUpiId;
@@ -439,7 +466,10 @@ async function handlePaymentConfig(interaction) {
     const impsAccount = interaction.options.getString('imps_account') ?? defaultImpsAccount;
     const impsIfsc = interaction.options.getString('imps_ifsc') ?? defaultImpsIfsc;
     const impsName = interaction.options.getString('imps_name') ?? defaultImpsName;
-    const cdmAccount = interaction.options.getString('cdm_account');
+    const cdmAccount = interaction.options.getString('cdm_account') ?? defaultCdmAccount;
+    const cdmBank = interaction.options.getString('cdm_bank') ?? defaultCdmBank;
+    const cdmIfsc = interaction.options.getString('cdm_ifsc') ?? defaultCdmIfsc;
+    const cdmName = interaction.options.getString('cdm_name') ?? defaultCdmName;
     const trc20Wallet = interaction.options.getString('trc20_wallet') ?? defaultTrc20Wallet;
     const erc20Wallet = interaction.options.getString('erc20_wallet');
     const bep20Wallet = interaction.options.getString('bep20_wallet') ?? defaultBep20Wallet;
@@ -450,7 +480,13 @@ async function handlePaymentConfig(interaction) {
     if (impsAccount !== null) updateObj.impsAccount = impsAccount;
     if (impsIfsc !== null) updateObj.impsIfsc = impsIfsc;
     if (impsName !== null) updateObj.impsName = impsName;
-    if (cdmAccount !== null) updateObj.cdmAccount = cdmAccount;
+    if (cdmAccount !== null) {
+        updateObj.cdmAccount = cdmAccount;
+        updateObj.cdmAccountNum = cdmAccount;
+    }
+    if (cdmBank !== null) updateObj.cdmBank = cdmBank;
+    if (cdmIfsc !== null) updateObj.cdmIfsc = cdmIfsc;
+    if (cdmName !== null) updateObj.cdmName = cdmName;
     if (trc20Wallet !== null) updateObj.trc20Wallet = trc20Wallet;
     if (erc20Wallet !== null) updateObj.erc20Wallet = erc20Wallet;
     if (bep20Wallet !== null) updateObj.bep20Wallet = bep20Wallet;
@@ -464,7 +500,7 @@ async function handlePaymentConfig(interaction) {
                     `**Configured Automated Accounts:**\n` +
                     `• **UPI ID:** \`${current.upiId || 'Not Configured'}\`\n` +
                     (current.impsAccount ? `• **IMPS Bank Account:** \`${current.impsAccount}\` (IFSC: \`${current.impsIfsc}\` - \`${current.impsName}\`)\n` : '') +
-                    (current.cdmAccount ? `• **CDM Account:** \`${current.cdmAccount}\`\n` : '') +
+                    (current.cdmAccount ? `• **CDM Account:** \`${current.cdmAccount}\` (${current.cdmBank || 'SBI'} - IFSC: \`${current.cdmIfsc || 'N/A'}\` - Name: \`${current.cdmName || 'N/A'}\`)\n` : '') +
                     `• **TRC20 Deposit Wallet:** \`${current.trc20Wallet || 'Not Configured'}\`\n` +
                     (current.erc20Wallet ? `• **ERC20 Deposit Wallet:** \`${current.erc20Wallet}\`\n` : '') +
                     `• **BEP20 Deposit Wallet:** \`${current.bep20Wallet || 'Not Configured'}\`\n\n` +

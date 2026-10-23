@@ -559,6 +559,37 @@ export async function claimTicket(channel, claimer) {
     } else {
       await channel.send({ embeds: [claimEmbed], components: [unclaimRow] });
     }
+
+    // Auto-dispatch official payment details or deposit wallet on staff claim (Security Claim-Gating)
+    if (ticketData.p2pTrade && !ticketData.paymentDispatched) {
+      try {
+        const { getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed } = await import('./p2pService.js');
+        const paymentConfig = await getP2PPaymentConfig(channel.guild.id);
+        const { isBuy, paymentMethod, networkLabel, buyTotalInr, buyReceiveUsdt, amountVal, totalInrPayout } = ticketData.p2pTrade;
+
+        let paymentEmbed;
+        if (isBuy) {
+          paymentEmbed = buildBuyPaymentEmbed(paymentMethod, paymentConfig, buyTotalInr, buyReceiveUsdt);
+          ticketData.p2pStep = 'waiting_payment_proof';
+        } else {
+          paymentEmbed = buildSellPaymentEmbed(networkLabel, paymentConfig, amountVal, totalInrPayout);
+        }
+
+        paymentEmbed.setFooter({
+          text: `🛡️ Verified Official Details • Authorized by @${claimer.tag || claimer.username || 'Staff'} • Beware of DM scams`
+        });
+
+        await channel.send({
+          content: `📢 <@${ticketData.userId}> **Official Payment Details have been unlocked by <@${claimer.id}>:**`,
+          embeds: [paymentEmbed]
+        });
+
+        ticketData.paymentDispatched = true;
+        await saveTicketData(channel.guild.id, channel.id, ticketData);
+      } catch (paymentErr) {
+        logger.error('Failed to dispatch P2P payment details on claim:', paymentErr);
+      }
+    }
     
     await logTicketEvent({
       client: channel.client,

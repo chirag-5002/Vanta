@@ -23,7 +23,11 @@ export const DEFAULT_PAYMENT_CONFIG = {
     impsAccount: null,
     impsIfsc: null,
     impsName: null,
-    cdmAccount: null,
+    cdmAccount: '45396667547',
+    cdmBank: 'State Bank of India',
+    cdmAccountNum: '45396667547',
+    cdmIfsc: 'SBIN0001679',
+    cdmName: 'Nehul Gupta',
     trc20Wallet: 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq',
     erc20Wallet: null,
     bep20Wallet: '0x67DF4D95E8d640D530e3399E580A194E7d7C6901',
@@ -200,23 +204,70 @@ export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CON
                 `📸 **Instruction:** Once IMPS transfer is complete, please upload your **Payment Screenshot** in this ticket channel.`
             );
     } else if (method === 'CDM') {
+        const bankName = config.cdmBank || 'State Bank of India';
+        const accNum = config.cdmAccountNum || config.cdmAccount || '45396667547';
+        const holderName = config.cdmName || 'Nehul Gupta';
+        const ifsc = config.cdmIfsc || 'SBIN0001679';
+
         embed.setTitle('🏧 Official CDM Cash Deposit Details')
             .setDescription(
                 headerLine +
-                `Please deposit cash via CDM using the account details below:\n\n` +
-                `> **CDM Account:** \`${config.cdmAccount}\`\n\n` +
-                `📸 **Instruction:** Once cash deposit is complete, please upload your **CDM Deposit Receipt Screenshot** in this ticket channel.`
+                `Please deposit cash via any **Cash Deposit Machine (CDM)** using the verified bank details below:\n\n` +
+                `> 🏦 **Bank Name:** \`${bankName}\`\n` +
+                `> 🔢 **Account Number:** \`${accNum}\`\n` +
+                `> 👤 **Account Holder Name:** \`${holderName}\`\n` +
+                `> 🏛️ **IFSC Code:** \`${ifsc}\`\n\n` +
+                `📸 **Instructions:**\n` +
+                `1. Visit any nearby CDM machine and deposit the exact cash amount.\n` +
+                `2. Once deposit is complete, please upload the **printed CDM receipt photo/screenshot** in this ticket channel.`
             );
     } else {
-        embed.setTitle('💳 Official CCW Deposit Instructions')
+        embed.setTitle('💳 Official Custom Deposit Instructions')
             .setDescription(
-                `CCW Payment Method selected.\n\n` +
-                `A verified Middleman / Support staff will provide custom CCW payment instructions in this ticket shortly.`
+                `Payment method selected: \`${method}\`.\n\n` +
+                `A verified Middleman / Support staff will provide custom payment instructions in this ticket shortly.`
             );
     }
 
     embed.setFooter({ text: 'ICN Payment Security • Verify details before sending' });
     return embed;
+}
+
+/**
+ * Returns current date string in Asia/Kolkata timezone (YYYY-MM-DD).
+ */
+export function getKolkataDateString() {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(new Date());
+}
+
+/**
+ * Gets the cumulative USDT amount a user has bought via online payments (UPI/IMPS combined) today.
+ */
+export async function getUserDailyOnlineSpent(guildId, userId) {
+    if (!guildId || !userId) return 0;
+    const today = getKolkataDateString();
+    const key = `guild:${guildId}:p2p:daily_online_spent:${userId}:${today}`;
+    const raw = await getFromDb(key, 0);
+    const val = typeof raw === 'number' ? raw : parseFloat(raw);
+    return isNaN(val) ? 0 : val;
+}
+
+/**
+ * Records an online buy transaction toward the user's daily online limit (UPI/IMPS).
+ */
+export async function addDailyOnlineSpent(guildId, userId, amount) {
+    if (!guildId || !userId || !amount) return 0;
+    const today = getKolkataDateString();
+    const key = `guild:${guildId}:p2p:daily_online_spent:${userId}:${today}`;
+    const current = await getUserDailyOnlineSpent(guildId, userId);
+    const updated = current + parseFloat(amount);
+    await setInDb(key, updated);
+    return updated;
 }
 
 /**
