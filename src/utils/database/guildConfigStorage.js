@@ -16,9 +16,9 @@ export function unwrapReplitData(data) {
     return data;
 }
 
-// In-memory cache for guild configs (3 min TTL)
+// In-memory cache for guild configs (10 min TTL)
 const guildConfigCache = new Map();
-const GUILD_CONFIG_CACHE_TTL_MS = 3 * 60 * 1000;
+const GUILD_CONFIG_CACHE_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Low-level guild config read. Returns normalized config with defaults;
@@ -37,7 +37,7 @@ export async function readGuildConfig(client, guildId, context = {}) {
 
         if (!client?.db || typeof client.db.get !== 'function') {
             logger.warn(`Database unavailable for readGuildConfig in guild ${guildId}`);
-            return normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
+            return cached?.data || normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
         }
 
         if (typeof client.db.isAvailable === 'function' && !client.db.isAvailable()) {
@@ -45,15 +45,19 @@ export async function readGuildConfig(client, guildId, context = {}) {
                 traceId: context.traceId,
                 guildId,
             });
-            return normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
+            return cached?.data || normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
         }
 
         const dbGetPromise = client.db.get(getGuildConfigKey(guildId), null);
-        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('DB_TIMEOUT'), 300));
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('DB_TIMEOUT'), 3500));
         const rawConfig = await Promise.race([dbGetPromise, timeoutPromise]);
 
         if (rawConfig === 'DB_TIMEOUT') {
-            logger.warn(`readGuildConfig timed out after 300ms in guild ${guildId}, using default fallback`);
+            logger.warn(`readGuildConfig timed out after 3.5s in guild ${guildId}`);
+            if (cached?.data) {
+                logger.info(`Using stale cached guild config for guild ${guildId} due to DB timeout`);
+                return cached.data;
+            }
             return normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
         }
 
@@ -75,6 +79,10 @@ export async function readGuildConfig(client, guildId, context = {}) {
             userId: context.userId,
             command: context.command,
         });
+        const cached = guildConfigCache.get(guildId);
+        if (cached?.data) {
+            return cached.data;
+        }
         return normalizeGuildConfig({}, GUILD_CONFIG_DEFAULTS);
     }
 }
