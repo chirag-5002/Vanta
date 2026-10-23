@@ -1,7 +1,7 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, PermissionFlagsBits, MessageFlags, ChannelType } from 'discord.js';
 import { createTicket } from '../../../services/ticket.js';
 import { getFromDb, setInDb, getP2PUserStatsKey } from '../../../utils/database.js';
-import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed, getUserDailyOnlineSpent, addDailyOnlineSpent } from '../../../services/p2pService.js';
+import { getP2PConfig, getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed, getUserDailyOnlineSpent, addDailyOnlineSpent, isNightRestricted } from '../../../services/p2pService.js';
 import { logger } from '../../../utils/logger.js';
 import { errorEmbed } from '../../../utils/embeds.js';
 import { wizardSelections, buildWizardComponents } from '../../selectMenus/p2p/p2pWizardSelect.js';
@@ -52,14 +52,8 @@ export const p2pAmountModalHandler = {
             });
         }
 
-        // Check time restriction (11 PM to 9 AM Kolkata timezone)
-        const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Kolkata',
-            hour: 'numeric',
-            hourCycle: 'h23',
-        }).format(new Date());
-        const hour = parseInt(kolkataTimeStr, 10);
-        if (hour >= 23 || hour < 9) {
+        // Check time restriction (11 PM to 9 AM Kolkata timezone) with manual override and staff bypass
+        if (isNightRestricted(config, interaction)) {
             await interaction.reply({
                 content: `⚠️ **We are not doing transactions between 11pm and 9am.**\n*This message will automatically disappear in 5 minutes.*`,
                 flags: MessageFlags.Ephemeral
@@ -212,13 +206,8 @@ export const p2pDetailsModalHandler = {
         }
 
         // Check time restriction (11 PM to 9 AM Kolkata timezone)
-        const kolkataTimeStr = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Kolkata',
-            hour: 'numeric',
-            hourCycle: 'h23',
-        }).format(new Date());
-        const hour = parseInt(kolkataTimeStr, 10);
-        if (hour >= 23 || hour < 9) {
+        // Check time restriction (11 PM to 9 AM Kolkata timezone) with manual override and staff bypass
+        if (isNightRestricted(config, interaction)) {
             await interaction.reply({
                 content: `⚠️ **We are not doing transactions between 11pm and 9am.**\n*This message will automatically disappear in 5 minutes.*`,
                 flags: MessageFlags.Ephemeral

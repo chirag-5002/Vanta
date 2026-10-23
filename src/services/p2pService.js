@@ -15,6 +15,8 @@ export const DEFAULT_P2P_CONFIG = {
     disabled: false,
     buyDisabled: false,
     sellDisabled: false,
+    manualNightOverride: false,
+    nightSessionOverride: null,
 };
 
 export const DEFAULT_PAYMENT_CONFIG = {
@@ -268,6 +270,56 @@ export async function addDailyOnlineSpent(guildId, userId, amount) {
     const updated = current + parseFloat(amount);
     await setInDb(key, updated);
     return updated;
+}
+
+/**
+ * Calculates current night session key (e.g. "2026-10-23" for night starting 23:00 on Oct 23 until 09:00 on Oct 24).
+ * Returns null if current time is within normal daytime hours (09:00 - 23:00 IST).
+ */
+export function getCurrentNightSession() {
+    const kolkataNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const hour = kolkataNow.getHours();
+    if (hour >= 23) {
+        const y = kolkataNow.getFullYear();
+        const m = String(kolkataNow.getMonth() + 1).padStart(2, '0');
+        const d = String(kolkataNow.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    } else if (hour < 9) {
+        const yesterday = new Date(kolkataNow.getTime() - 24 * 60 * 60 * 1000);
+        const y = yesterday.getFullYear();
+        const m = String(yesterday.getMonth() + 1).padStart(2, '0');
+        const d = String(yesterday.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+    return null;
+}
+
+/**
+ * Checks if transactions are currently restricted due to night hours (11 PM - 9 AM IST).
+ * Returns false (allowed) if:
+ * 1. It is currently daytime (09:00 - 23:00 IST).
+ * 2. Or the interacting user has Staff/Admin permissions (ManageGuild, Administrator, or Staff Role).
+ * 3. Or an Admin has manually enabled transactions via /p2p toggle (manualNightOverride or nightSessionOverride).
+ */
+export function isNightRestricted(config, interaction) {
+    const nightSession = getCurrentNightSession();
+    if (!nightSession) return false; // Daytime -> not restricted
+
+    // Staff or Admin can always test and operate without being blocked
+    const isStaffOrAdmin = interaction?.memberPermissions?.has?.(PermissionFlagsBits.ManageGuild) ||
+        interaction?.memberPermissions?.has?.(PermissionFlagsBits.Administrator) ||
+        (config?.staffRoleId && interaction?.member?.roles?.cache?.has?.(config.staffRoleId));
+
+    if (isStaffOrAdmin) {
+        return false;
+    }
+
+    // Manual override enabled via /p2p toggle
+    if (config?.manualNightOverride === true || config?.nightSessionOverride === nightSession) {
+        return false;
+    }
+
+    return true; // Night restricted
 }
 
 /**

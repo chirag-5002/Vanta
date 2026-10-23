@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents, sendVouchMessagesAndScheduleClose, sendTransactionDetailsLog, sendTransactionCertificate } from '../../services/p2pService.js';
+import { getP2PConfig, saveP2PConfig, getP2PPaymentConfig, saveP2PPaymentConfig, logDeal, buildDealEmbed, buildDealComponents, getUserP2PStats, getGuildP2PStats, autoDetectDealFromChannel, buildPriceUpdateEmbed, buildPriceComponents, sendVouchMessagesAndScheduleClose, sendTransactionDetailsLog, sendTransactionCertificate, getCurrentNightSession } from '../../services/p2pService.js';
 import { getTicketData, saveTicketData, deleteFromDb } from '../../utils/database.js';
 import { successEmbed, infoEmbed } from '../../utils/embeds.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -1207,13 +1207,28 @@ async function handleToggle(interaction) {
         statusText = `USDT **Buy & Sell** transactions have been **${enabled ? 'ENABLED' : 'DISABLED'}** globally.`;
     }
 
+    const nightSession = getCurrentNightSession();
+    if (enabled) {
+        config.manualNightOverride = true;
+        if (nightSession) {
+            config.nightSessionOverride = nightSession;
+        }
+    } else {
+        config.manualNightOverride = false;
+        config.nightSessionOverride = null;
+    }
+
     await saveP2PConfig(interaction.guildId, config);
+
+    const nightNote = nightSession
+        ? `\n\n🌙 **Night Hours Status (11 PM - 9 AM IST):** Transactions are **${enabled ? 'ALLOWED (Manual Override Active)' : 'BLOCKED'}**.`
+        : '';
 
     return await InteractionHelper.safeEditReply(interaction, {
         embeds: [
             successEmbed(
                 'P2P Transactions Status Updated',
-                `${statusText}\n\n${
+                `${statusText}${nightNote}\n\n${
                     enabled 
                         ? 'Users can now create tickets for enabled categories normally.' 
                         : 'Users trying to open tickets for disabled categories will receive a notice that transactions are offline.'
