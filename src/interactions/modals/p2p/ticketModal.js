@@ -408,15 +408,6 @@ export const p2pDetailsModalHandler = {
                 ].join('\n');
             }
 
-            // Security & Claim Disclaimer note at bottom of summary card
-            const securityNotice = [
-                '',
-                '🔒 **Official Payment Security Notice:**',
-                '> Official payment details / deposit account will be provided right here once a verified **Staff Member claims your ticket**.',
-                '> ⚠️ **Anti-Scam Alert:** Never accept payment details in DMs. All official payment details appear inside this ticket only after staff claim.'
-            ].join('\n');
-            cardDescription += '\n' + securityNotice;
-
             const summaryEmbed = new EmbedBuilder()
                 .setTitle(title)
                 .setDescription(cardDescription)
@@ -438,6 +429,23 @@ export const p2pDetailsModalHandler = {
                 content: `<@${interaction.user.id}> ${staffRoleId ? `<@&${staffRoleId}>` : ''}`,
                 embeds: [summaryEmbed],
                 components: [controlsRow]
+            });
+
+            // Separate Dedicated Security Notice Embed
+            const securityEmbed = new EmbedBuilder()
+                .setTitle('🔒 Official Payment Security Notice')
+                .setDescription(
+                    `> 🛡️ **Official payment details / deposit account will be provided right here once a verified Staff Member claims your ticket.**\n\n` +
+                    `⚠️ **Anti-Scam Alert:**\n` +
+                    `• Never accept payment details, QR codes, or wallet addresses sent in **Direct Messages (DMs)**.\n` +
+                    `• Official payment details will **ONLY** appear inside this ticket channel after a verified staff member claims it.\n` +
+                    `• Please wait for a staff member to click **Claim** above.`
+                )
+                .setColor('#F1C40F')
+                .setFooter({ text: 'ICN Security Protocol • Waiting for staff member to claim ticket' });
+
+            await ticketChannel.send({
+                embeds: [securityEmbed]
             });
 
             // Store P2P trade payload on ticketData to be dispatched upon ticket claim
