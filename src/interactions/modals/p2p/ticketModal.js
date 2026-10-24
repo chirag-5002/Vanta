@@ -119,7 +119,7 @@ export const p2pAmountModalHandler = {
         const amount = amountVal.toString();
 
         const dailyOnlineSpent = isBuy ? await getUserDailyOnlineSpent(interaction.guildId, interaction.user.id) : 0;
-        const isOverLimit = isBuy && (amountVal > 250 || (dailyOnlineSpent + amountVal > 250));
+        const isOverLimit = isBuy && (amountVal > 260 || (dailyOnlineSpent + amountVal > 260));
         const autoMethod = isOverLimit ? 'CDM' : null;
 
         // Store amount and limit tracking in wizard selections
@@ -135,15 +135,15 @@ export const p2pAmountModalHandler = {
 
         let routingNotice = '';
         if (isBuy) {
-            if (amountVal > 250) {
-                routingNotice = `\n\n🏦 **High-Value Order Routing (> 250 USDT):**\n` +
-                    `> Orders above **250 USDT** are exclusively processed via **Cash Deposit Machine (CDM)** for maximum bank security and zero freeze risk. Online methods (UPI/IMPS) are disabled.`;
-            } else if (dailyOnlineSpent + amountVal > 250) {
+            if (amountVal > 260) {
+                routingNotice = `\n\n🏦 **High-Value Order Routing (> 260 USDT):**\n` +
+                    `> Orders above **260 USDT** are exclusively processed via **Cash Deposit Machine (CDM)** for maximum bank security and zero freeze risk. Online methods (UPI/IMPS) are disabled.`;
+            } else if (dailyOnlineSpent + amountVal > 260) {
                 routingNotice = `\n\n🏦 **Daily Online Quota Reached:**\n` +
-                    `> You have used **${dailyOnlineSpent.toFixed(2)} / 250 USDT** of your daily online quota.\n` +
-                    `> Adding **${amountVal} USDT** exceeds the daily cap of 250 USDT. **Cash Deposit Machine (CDM)** is automatically selected.`;
+                    `> You have used **${dailyOnlineSpent.toFixed(2)} / 260 USDT** of your daily online quota.\n` +
+                    `> Adding **${amountVal} USDT** exceeds the daily cap of 260 USDT. **Cash Deposit Machine (CDM)** is automatically selected.`;
             } else {
-                const remaining = 250 - dailyOnlineSpent;
+                const remaining = 260 - dailyOnlineSpent;
                 routingNotice = `\n\n💳 **Daily Online Quota:** **${remaining.toFixed(2)} USDT** remaining today for UPI/IMPS.`;
             }
         }
@@ -250,10 +250,10 @@ export const p2pDetailsModalHandler = {
             const amountVal = parseFloat(amountDisplay) || 0;
             if (isBuy && (paymentMethod === 'UPI' || paymentMethod === 'IMPS')) {
                 const dailyOnlineSpent = await getUserDailyOnlineSpent(interaction.guildId, interaction.user.id);
-                if (amountVal > 250 || (dailyOnlineSpent + amountVal > 250)) {
+                if (amountVal > 260 || (dailyOnlineSpent + amountVal > 260)) {
                     wizardSelections.delete(key);
                     return await interaction.followUp({
-                        content: `❌ **Daily Online Limit Exceeded:** Purchases over 250 USDT or cumulative daily online purchases > 250 USDT must use **Cash Deposit Machine (CDM)**. Your used quota today is \`${dailyOnlineSpent.toFixed(2)} / 250 USDT\`.\nPlease restart the trade and select **CDM**.`,
+                        content: `❌ **Daily Online Limit Exceeded:** Purchases over 260 USDT or cumulative daily online purchases > 260 USDT must use **Cash Deposit Machine (CDM)**. Your used quota today is \`${dailyOnlineSpent.toFixed(2)} / 260 USDT\`.\nPlease restart the trade and select **CDM**.`,
                         flags: MessageFlags.Ephemeral
                     });
                 }

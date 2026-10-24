@@ -14,17 +14,17 @@ export function buildWizardComponents(tradeType, kycType, selectedPayment = null
     let paymentOptions = [];
 
     if (isBuy) {
-        const isOver250 = (amountVal !== null && amountVal > 250);
-        const wouldExceedDaily = (amountVal !== null && (dailyOnlineSpent + amountVal > 250));
+        const isOver260 = (amountVal !== null && amountVal > 260);
+        const wouldExceedDaily = (amountVal !== null && (dailyOnlineSpent + amountVal > 260));
 
-        if (isOver250 || wouldExceedDaily) {
-            // Buy > 250 USDT or daily online limit (250 USDT) exceeded: ONLY CDM allowed!
+        if (isOver260 || wouldExceedDaily) {
+            // Buy > 260 USDT or daily online limit (260 USDT) exceeded: ONLY CDM allowed!
             paymentOptions = [
                 {
                     label: 'CDM (Cash Deposit Machine)',
                     value: 'CDM',
                     emoji: '🏧',
-                    description: isOver250 ? 'Mandatory for transactions > 250 USDT' : 'Daily online limit (250 USDT) reached'
+                    description: isOver260 ? 'Mandatory for transactions > 260 USDT' : 'Daily online limit (260 USDT) reached'
                 }
             ];
             // Auto-select CDM
@@ -32,8 +32,8 @@ export function buildWizardComponents(tradeType, kycType, selectedPayment = null
                 selectedPayment = 'CDM';
             }
         } else {
-            // Under 250 USDT and within daily online limit: UPI & IMPS available
-            const remainingDaily = Math.max(0, 250 - dailyOnlineSpent);
+            // Up to 260 USDT and within daily online limit: UPI & IMPS available
+            const remainingDaily = Math.max(0, 260 - dailyOnlineSpent);
             paymentOptions = [
                 {
                     label: 'UPI',
