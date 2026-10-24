@@ -330,6 +330,7 @@ export const p2pDetailsModalHandler = {
 
             let buyReceiveUsdt = 0;
             let buyTotalInr = 0;
+            let sellTotalInrPayout = 0;
 
             if (isBuy) {
                 const isTrc = networkRaw.toUpperCase().includes('TRC');
@@ -391,6 +392,7 @@ export const p2pDetailsModalHandler = {
                 } else {
                     totalInrPayout = totalInrPayout - 250;
                 }
+                sellTotalInrPayout = totalInrPayout;
                 const feeDetails = isKyc ? 'Flat ₹100 network fee' : 'Flat ₹250 non-KYC fee';
 
                 cardDescription = [
@@ -451,9 +453,9 @@ export const p2pDetailsModalHandler = {
             // Store P2P trade payload on ticketData to be dispatched upon ticket claim
             try {
                 const { getTicketData, saveTicketData } = await import('../../../utils/database.js');
-                const ticketData = await getTicketData(interaction.guildId, ticketChannel.id).catch(() => null);
-                if (ticketData) {
-                    ticketData.p2pTrade = {
+                const targetTicketData = result?.ticketData || (await getTicketData(interaction.guildId, ticketChannel.id).catch(() => null));
+                if (targetTicketData) {
+                    targetTicketData.p2pTrade = {
                         isBuy,
                         paymentMethod,
                         networkLabel,
@@ -461,11 +463,12 @@ export const p2pDetailsModalHandler = {
                         buyReceiveUsdt,
                         amountVal,
                         sellPrice,
-                        totalInrPayout: isBuy ? buyTotalInr : totalInrPayout,
+                        totalInrPayout: isBuy ? buyTotalInr : sellTotalInrPayout,
                         isKyc,
                     };
-                    ticketData.paymentDispatched = false;
-                    await saveTicketData(interaction.guildId, ticketChannel.id, ticketData);
+                    targetTicketData.paymentDispatched = false;
+                    await saveTicketData(interaction.guildId, ticketChannel.id, targetTicketData);
+                    logger.info(`Attached P2P trade data to ticket ${ticketChannel.id}:`, targetTicketData.p2pTrade);
                 }
             } catch (err) {
                 logger.error('Failed to attach P2P trade data to ticket:', err);

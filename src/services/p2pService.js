@@ -180,8 +180,10 @@ export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CON
     const method = (paymentMethod || '').toUpperCase();
     const embed = new EmbedBuilder().setColor('#2ECC71');
 
-    const amountLine = totalInr ? `💵 **Amount to Pay:** \`₹${totalInr.toFixed(2)} INR\`\n` : '';
-    const receiveLine = receiveUsdt ? `🪙 **Net USDT You Receive:** \`${receiveUsdt.toFixed(2)} USDT\`\n\n` : (totalInr ? '\n' : '');
+    const numTotalInr = typeof totalInr === 'number' ? totalInr : parseFloat(totalInr);
+    const numReceiveUsdt = typeof receiveUsdt === 'number' ? receiveUsdt : parseFloat(receiveUsdt);
+    const amountLine = (!isNaN(numTotalInr) && numTotalInr > 0) ? `💵 **Amount to Pay:** \`₹${numTotalInr.toFixed(2)} INR\`\n` : '';
+    const receiveLine = (!isNaN(numReceiveUsdt) && numReceiveUsdt > 0) ? `🪙 **Net USDT You Receive:** \`${numReceiveUsdt.toFixed(2)} USDT\`\n\n` : (amountLine ? '\n' : '');
     const headerLine = amountLine + receiveLine;
 
     if (method === 'UPI') {
@@ -340,8 +342,10 @@ export function buildSellPaymentEmbed(network, config = DEFAULT_PAYMENT_CONFIG, 
         label = 'USDT (BEP20)';
     }
 
-    const amountLine = amountVal ? `🪙 **USDT to Deposit:** \`${amountVal.toFixed(2)} USDT\`\n` : '';
-    const payoutLine = totalInrPayout ? `💵 **Expected Payout:** \`₹${totalInrPayout.toFixed(2)} INR\`\n\n` : '\n';
+    const numAmount = typeof amountVal === 'number' ? amountVal : parseFloat(amountVal);
+    const numPayout = typeof totalInrPayout === 'number' ? totalInrPayout : parseFloat(totalInrPayout);
+    const amountLine = (!isNaN(numAmount) && numAmount > 0) ? `🪙 **USDT to Deposit:** \`${numAmount.toFixed(2)} USDT\`\n` : '';
+    const payoutLine = (!isNaN(numPayout) && numPayout > 0) ? `💵 **Expected Payout:** \`₹${numPayout.toFixed(2)} INR\`\n\n` : '\n';
 
     embed.setTitle(`📥 Official Deposit Wallet for ${label}`)
         .setDescription(

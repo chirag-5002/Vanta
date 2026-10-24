@@ -561,11 +561,33 @@ export async function claimTicket(channel, claimer) {
     }
 
     // Auto-dispatch official payment details or deposit wallet on staff claim (Security Claim-Gating)
-    if (ticketData.p2pTrade && !ticketData.paymentDispatched) {
+    let p2pTrade = ticketData.p2pTrade;
+
+    // Fallback: If p2pTrade was not directly attached to ticketData, auto-detect from ticket reason
+    if (!p2pTrade && ticketData.reason) {
+      const reasonMatch = ticketData.reason.match(/(Buy|Sell)\s+([\d.]+)\s+USDT\s+via\s+([^\s(]+)(?:\s+\(([^)]+)\))?/i);
+      if (reasonMatch) {
+        const isBuy = reasonMatch[1].toLowerCase() === 'buy';
+        const amountVal = parseFloat(reasonMatch[2]) || 0;
+        const paymentMethod = reasonMatch[3].toUpperCase();
+        const networkLabel = reasonMatch[4] || (isBuy ? 'USDT TRC20' : 'USDT BEP20');
+        p2pTrade = {
+          isBuy,
+          paymentMethod,
+          networkLabel,
+          amountVal,
+          buyTotalInr: 0,
+          buyReceiveUsdt: amountVal,
+          totalInrPayout: 0
+        };
+      }
+    }
+
+    if (p2pTrade && !ticketData.paymentDispatched) {
       try {
         const { getP2PPaymentConfig, buildBuyPaymentEmbed, buildSellPaymentEmbed } = await import('./p2pService.js');
         const paymentConfig = await getP2PPaymentConfig(channel.guild.id);
-        const { isBuy, paymentMethod, networkLabel, buyTotalInr, buyReceiveUsdt, amountVal, totalInrPayout } = ticketData.p2pTrade;
+        const { isBuy, paymentMethod, networkLabel, buyTotalInr, buyReceiveUsdt, amountVal, totalInrPayout } = p2pTrade;
 
         let paymentEmbed;
         if (isBuy) {
@@ -575,8 +597,9 @@ export async function claimTicket(channel, claimer) {
           paymentEmbed = buildSellPaymentEmbed(networkLabel, paymentConfig, amountVal, totalInrPayout);
         }
 
+        const claimerName = claimer?.tag || claimer?.username || 'Staff';
         paymentEmbed.setFooter({
-          text: `🛡️ Verified Official Details • Authorized by @${claimer.tag || claimer.username || 'Staff'} • Beware of DM scams`
+          text: `🛡️ Verified Official Details • Authorized by @${claimerName} • Beware of DM scams`
         });
 
         await channel.send({
@@ -585,7 +608,9 @@ export async function claimTicket(channel, claimer) {
         });
 
         ticketData.paymentDispatched = true;
+        ticketData.p2pTrade = p2pTrade;
         await saveTicketData(channel.guild.id, channel.id, ticketData);
+        logger.info(`Dispatched P2P payment details on claim in channel ${channel.id}`);
       } catch (paymentErr) {
         logger.error('Failed to dispatch P2P payment details on claim:', paymentErr);
       }
