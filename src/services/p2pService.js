@@ -314,8 +314,8 @@ export function isNightRestricted(config, interaction) {
         return false;
     }
 
-    // Manual override enabled via /p2p toggle
-    if (config?.manualNightOverride === true || config?.nightSessionOverride === nightSession) {
+    // Allow regular users only if an Admin manually enabled transactions during this specific night session
+    if (config?.nightSessionOverride && config.nightSessionOverride === nightSession) {
         return false;
     }
 

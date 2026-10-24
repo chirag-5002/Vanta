@@ -1209,20 +1209,17 @@ async function handleToggle(interaction) {
 
     const nightSession = getCurrentNightSession();
     if (enabled) {
-        config.manualNightOverride = true;
-        if (nightSession) {
-            config.nightSessionOverride = nightSession;
-        }
+        // If toggling during night hours (11 PM - 9 AM), activate override for this night session only
+        config.nightSessionOverride = nightSession || null;
     } else {
-        config.manualNightOverride = false;
         config.nightSessionOverride = null;
     }
 
     await saveP2PConfig(interaction.guildId, config);
 
     const nightNote = nightSession
-        ? `\n\n🌙 **Night Hours Status (11 PM - 9 AM IST):** Transactions are **${enabled ? 'ALLOWED (Manual Override Active)' : 'BLOCKED'}**.`
-        : '';
+        ? `\n\n🌙 **Night Hours Status (11 PM - 9 AM IST):** Transactions are **${enabled ? 'ALLOWED (Override Active for this session)' : 'BLOCKED'}**.`
+        : `\n\n🌙 **Night Hours (11 PM - 9 AM IST):** Transactions will automatically pause at **11:00 PM IST**.`;
 
     return await InteractionHelper.safeEditReply(interaction, {
         embeds: [
