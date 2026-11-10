@@ -474,14 +474,8 @@ export const p2pDetailsModalHandler = {
                 logger.error('Failed to attach P2P trade data to ticket:', err);
             }
 
-            // Track daily online spent for user if Buy via online methods (UPI/IMPS)
-            if (isBuy && (paymentMethod === 'UPI' || paymentMethod === 'IMPS')) {
-                try {
-                    await addDailyOnlineSpent(interaction.guildId, interaction.user.id, amountVal);
-                } catch (err) {
-                    logger.error('Failed to increment daily online spent:', err);
-                }
-            }
+            // Note: Daily online quota is recorded upon successful deal completion/logging (in logDeal)
+            // to ensure uncompleted or cancelled tickets do not unfairly consume the user's daily quota.
 
             await interaction.editReply({
                 content: `✅ Your **${isBuy ? 'Buy' : 'Sell'} USDT Ticket** has been created in <#${ticketChannel.id}>!`,

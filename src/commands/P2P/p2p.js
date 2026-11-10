@@ -785,6 +785,8 @@ async function handleAutoLog(interaction) {
         usdAmount: detected.usdAmount,
         txHash: detected.txHash,
         dealInfo: detected.dealInfo,
+        paymentMethod: detected.paymentMethod,
+        isBuy: !detected.isSell,
         status: 'Completed',
         loggedBy: interaction.user.id
     });
@@ -965,6 +967,15 @@ async function handleDeal(interaction) {
     const buyerName = buyerMember?.displayName || buyer.displayName || buyer.username;
     const sellerName = sellerMember?.displayName || seller.displayName || seller.username;
 
+    let manualPaymentMethod = null;
+    const ticketDataBefore = await getTicketData(interaction.guildId, interaction.channel.id).catch(() => null);
+    if (ticketDataBefore?.p2pTrade?.paymentMethod) {
+        manualPaymentMethod = ticketDataBefore.p2pTrade.paymentMethod.toUpperCase();
+    } else if (ticketDataBefore?.reason) {
+        const methodMatch = ticketDataBefore.reason.match(/via\s+(UPI|IMPS|CDM)/i);
+        if (methodMatch) manualPaymentMethod = methodMatch[1].toUpperCase();
+    }
+
     const dealRecord = await logDeal(interaction.guildId, {
         buyerId: buyer.id,
         sellerId: seller.id,
@@ -974,6 +985,7 @@ async function handleDeal(interaction) {
         usdAmount,
         txHash,
         dealInfo,
+        paymentMethod: manualPaymentMethod,
         status,
         loggedBy: interaction.user.id
     });

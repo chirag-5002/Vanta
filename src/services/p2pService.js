@@ -275,6 +275,29 @@ export async function addDailyOnlineSpent(guildId, userId, amount) {
 }
 
 /**
+ * Deducts an amount from user's daily online spent (e.g. on trade reversal or adjustment).
+ */
+export async function deductDailyOnlineSpent(guildId, userId, amount) {
+    if (!guildId || !userId || !amount) return 0;
+    const today = getKolkataDateString();
+    const key = `guild:${guildId}:p2p:daily_online_spent:${userId}:${today}`;
+    const current = await getUserDailyOnlineSpent(guildId, userId);
+    const updated = Math.max(0, current - parseFloat(amount));
+    await setInDb(key, updated);
+    return updated;
+}
+
+/**
+ * Resets a user's daily online quota for today.
+ */
+export async function resetDailyOnlineSpent(guildId, userId) {
+    if (!guildId || !userId) return;
+    const today = getKolkataDateString();
+    const key = `guild:${guildId}:p2p:daily_online_spent:${userId}:${today}`;
+    await setInDb(key, 0);
+}
+
+/**
  * Calculates current night session key (e.g. "2026-10-23" for night starting 23:00 on Oct 23 until 09:00 on Oct 24).
  * Returns null if current time is within normal daytime hours (09:00 - 23:00 IST).
  */
@@ -518,6 +541,7 @@ export async function autoDetectDealFromChannel(channel, guildId) {
     let txHash = null;
     let isSell = false;
     let userCreatorId = null;
+    let paymentMethod = null;
 
     try {
         const ticketData = await getTicketData(guildId, channel.id).catch(() => null);
@@ -530,6 +554,13 @@ export async function autoDetectDealFromChannel(channel, guildId) {
             const amountMatch = reason.match(/(Buy|Sell)\s+(\d+(\.\d+)?)\s+USDT/i);
             if (amountMatch) {
                 usdtAmount = parseFloat(amountMatch[2]);
+            }
+
+            if (ticketData.p2pTrade?.paymentMethod) {
+                paymentMethod = ticketData.p2pTrade.paymentMethod.toUpperCase();
+            } else {
+                const methodMatch = reason.match(/via\s+(UPI|IMPS|CDM)/i);
+                if (methodMatch) paymentMethod = methodMatch[1].toUpperCase();
             }
         } else {
             const channelName = channel.name?.toLowerCase() || '';
@@ -600,7 +631,9 @@ export async function autoDetectDealFromChannel(channel, guildId) {
         usdtAmount: usdtAmount || minLimit,
         usdAmount: usdtAmount || minLimit,
         txHash: txHash || null,
-        dealInfo: isSell ? 'SELL USDT DEAL' : 'BUY USDT DEAL'
+        dealInfo: isSell ? 'SELL USDT DEAL' : 'BUY USDT DEAL',
+        paymentMethod: paymentMethod || 'UPI',
+        isSell
     };
 }
 
@@ -689,6 +722,8 @@ export async function autoDetectAndPublishDeal(channel, guildId, executorId = nu
         usdAmount: detected.usdAmount,
         txHash: detected.txHash,
         dealInfo: detected.dealInfo,
+        paymentMethod: detected.paymentMethod,
+        isBuy: !detected.isSell,
         status: 'Completed',
         loggedBy: executorId || (buyerId === botId ? sellerId : buyerId)
     }, botId);
@@ -1032,6 +1067,7 @@ export async function logDeal(guildId, dealData, botId = null) {
         usdAmount: dealData.usdAmount || dealData.usdtAmount,
         txHash: dealData.txHash || null,
         dealInfo: dealData.dealInfo || 'P2P Deal',
+        paymentMethod: dealData.paymentMethod || null,
         status: dealData.status || 'Completed',
         loggedBy: dealData.loggedBy,
         timestamp,
@@ -1047,6 +1083,25 @@ export async function logDeal(guildId, dealData, botId = null) {
 
     await updateUserStats(guildId, dealData.buyerId, record, botId);
     await updateUserStats(guildId, dealData.sellerId, record, botId);
+
+    // Track daily online spent (UPI/IMPS limit: 260 USDT) only when a Buy deal is successfully completed
+    const paymentMethodUpper = (dealData.paymentMethod || '').toUpperCase();
+    const isOnlineMethod = paymentMethodUpper === 'UPI' || paymentMethodUpper === 'IMPS';
+    const isBuyDeal = dealData.isBuy === true ||
+                      (dealData.dealInfo && dealData.dealInfo.toLowerCase().includes('buy')) ||
+                      (dealData.buyerId && dealData.buyerId !== 'server' && dealData.buyerId !== botId && (dealData.sellerId === botId || dealData.sellerId === 'server'));
+
+    if (record.status === 'Completed' && isBuyDeal && (isOnlineMethod || (!paymentMethodUpper && paymentMethodUpper !== 'CDM'))) {
+        const buyerId = dealData.buyerId;
+        if (buyerId && buyerId !== 'server' && buyerId !== botId) {
+            try {
+                await addDailyOnlineSpent(guildId, buyerId, dealData.usdtAmount);
+                logger.info(`[Daily Online Quota] Added ${dealData.usdtAmount} USDT to daily online spent for buyer ${buyerId}.`);
+            } catch (err) {
+                logger.error('[Daily Online Quota] Failed to update daily online spent in logDeal:', err);
+            }
+        }
+    }
 
     return record;
 }
