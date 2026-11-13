@@ -441,24 +441,24 @@ async function handlePaymentConfig(interaction) {
         defaultUpiId = 'amitsalianjk24-1@okaxis';
         defaultTrc20Wallet = 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq';
         defaultBep20Wallet = '0x67DF4D95E8d640D530e3399E580A194E7d7C6901';
-        defaultImpsAccount = '';
-        defaultImpsIfsc = '';
-        defaultImpsName = '';
-        defaultCdmAccount = '45396667547';
-        defaultCdmBank = 'State Bank of India';
-        defaultCdmIfsc = 'SBIN0001679';
-        defaultCdmName = 'Nehul Gupta';
+        defaultImpsAccount = '45729299372';
+        defaultImpsIfsc = 'SBIN0002271';
+        defaultImpsName = 'Amit Ashok Salian';
+        defaultCdmAccount = '45729299372';
+        defaultCdmBank = 'SBI';
+        defaultCdmIfsc = 'SBIN0002271';
+        defaultCdmName = 'Amit Ashok Salian';
     } else if (profile === 'nehul') {
-        defaultUpiId = 'innercircle26@ybl';
+        defaultUpiId = '';
         defaultTrc20Wallet = 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq';
         defaultBep20Wallet = '0x67DF4D95E8d640D530e3399E580A194E7d7C6901';
-        defaultImpsAccount = '45396667547';
-        defaultImpsIfsc = 'SBIN0001679';
-        defaultImpsName = 'Nehul Gupta';
-        defaultCdmAccount = '45396667547';
-        defaultCdmBank = 'State Bank of India';
-        defaultCdmIfsc = 'SBIN0001679';
-        defaultCdmName = 'Nehul Gupta';
+        defaultImpsAccount = '45729299372';
+        defaultImpsIfsc = 'SBIN0002271';
+        defaultImpsName = 'Amit Ashok Salian';
+        defaultCdmAccount = '45729299372';
+        defaultCdmBank = 'SBI';
+        defaultCdmIfsc = 'SBIN0002271';
+        defaultCdmName = 'Amit Ashok Salian';
     }
 
     const upiId = interaction.options.getString('upi_id') ?? defaultUpiId;

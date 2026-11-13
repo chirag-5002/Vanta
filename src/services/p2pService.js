@@ -22,14 +22,14 @@ export const DEFAULT_P2P_CONFIG = {
 export const DEFAULT_PAYMENT_CONFIG = {
     upiId: 'amitsalianjk24-1@okaxis',
     upiQrUrl: null,
-    impsAccount: null,
-    impsIfsc: null,
-    impsName: null,
-    cdmAccount: '45396667547',
-    cdmBank: 'State Bank of India',
-    cdmAccountNum: '45396667547',
-    cdmIfsc: 'SBIN0001679',
-    cdmName: 'Nehul Gupta',
+    impsAccount: '45729299372',
+    impsIfsc: 'SBIN0002271',
+    impsName: 'Amit Ashok Salian',
+    cdmAccount: '45729299372',
+    cdmBank: 'SBI',
+    cdmAccountNum: '45729299372',
+    cdmIfsc: 'SBIN0002271',
+    cdmName: 'Amit Ashok Salian',
     trc20Wallet: 'TNQvuEjN3ubPq7EQ7tLmrraa7PAq9Uy5Nq',
     erc20Wallet: null,
     bep20Wallet: '0x67DF4D95E8d640D530e3399E580A194E7d7C6901',
@@ -71,9 +71,9 @@ export async function saveP2PConfig(guildId, newConfig) {
 
 const OLD_TRC_WALLETS = new Set(['TCpRGdPLdN2bm4aRtTqHpCbEw8Uh2h2rtT', 'T9xICNUSDTTRC20OfficialWalletAddress']);
 const OLD_BEP_WALLETS = new Set(['0xB6D7277EDEC09d6C40DE43f5A0C9CD02C66a1452', '0x71C569ICNUSDTBEP20OfficialWalletAddress', '0x71C569ICNUSDTERC20OfficialWalletAddress']);
-const OLD_DEMO_UPIS = new Set(['icn@upi', 'innercircle20@ibl', 'icn224@ibl']);
-const OLD_DEMO_IMPS = new Set(['998877665544', '4496001700126905']);
-const OLD_DEMO_CDM = new Set(['998877665544 (State Bank of India)']);
+const OLD_DEMO_UPIS = new Set(['icn@upi', 'innercircle20@ibl', 'icn224@ibl', 'innercircle26@ybl']);
+const OLD_DEMO_IMPS = new Set(['998877665544', '4496001700126905', '45396667547']);
+const OLD_DEMO_CDM = new Set(['998877665544 (State Bank of India)', '45396667547']);
 
 /**
  * Sanitizes and strips old wallet addresses and demo data from a payment config object.
@@ -89,16 +89,22 @@ function sanitizePaymentConfig(config) {
     if (OLD_BEP_WALLETS.has(config.erc20Wallet)) {
         config.erc20Wallet = null;
     }
-    if (!config.upiId || OLD_DEMO_UPIS.has(config.upiId)) {
+    if (config.upiId === 'innercircle26@ybl') {
+        config.upiId = '';
+    } else if (!config.upiId || OLD_DEMO_UPIS.has(config.upiId)) {
         config.upiId = DEFAULT_PAYMENT_CONFIG.upiId;
     }
-    if (OLD_DEMO_IMPS.has(config.impsAccount)) {
+    if (OLD_DEMO_IMPS.has(config.impsAccount) || config.impsName === 'Nehul Gupta' || config.impsAccount === '45396667547' || config.impsIfsc === 'SBIN0001679') {
         config.impsAccount = DEFAULT_PAYMENT_CONFIG.impsAccount;
         config.impsIfsc = DEFAULT_PAYMENT_CONFIG.impsIfsc;
         config.impsName = DEFAULT_PAYMENT_CONFIG.impsName;
     }
-    if (OLD_DEMO_CDM.has(config.cdmAccount)) {
-        config.cdmAccount = null;
+    if (OLD_DEMO_CDM.has(config.cdmAccount) || config.cdmName === 'Nehul Gupta' || config.cdmAccount === '45396667547' || config.cdmIfsc === 'SBIN0001679') {
+        config.cdmAccount = DEFAULT_PAYMENT_CONFIG.cdmAccount;
+        config.cdmAccountNum = DEFAULT_PAYMENT_CONFIG.cdmAccountNum;
+        config.cdmBank = DEFAULT_PAYMENT_CONFIG.cdmBank;
+        config.cdmIfsc = DEFAULT_PAYMENT_CONFIG.cdmIfsc;
+        config.cdmName = DEFAULT_PAYMENT_CONFIG.cdmName;
     }
     return config;
 }
@@ -125,8 +131,15 @@ export async function getP2PPaymentConfig(guildId) {
         OLD_BEP_WALLETS.has(data.bep20Wallet) ||
         OLD_BEP_WALLETS.has(data.erc20Wallet) ||
         OLD_DEMO_UPIS.has(data.upiId) ||
+        data.upiId === 'innercircle26@ybl' ||
         OLD_DEMO_IMPS.has(data.impsAccount) ||
-        OLD_DEMO_CDM.has(data.cdmAccount)
+        OLD_DEMO_CDM.has(data.cdmAccount) ||
+        data.impsAccount === '45396667547' ||
+        data.cdmAccount === '45396667547' ||
+        data.impsName === 'Nehul Gupta' ||
+        data.cdmName === 'Nehul Gupta' ||
+        data.cdmIfsc === 'SBIN0001679' ||
+        data.impsIfsc === 'SBIN0001679'
     )) {
         const key = `guild:${guildId}:p2p:payments`;
         await setInDb(key, config).catch(() => {});
@@ -208,10 +221,10 @@ export function buildBuyPaymentEmbed(paymentMethod, config = DEFAULT_PAYMENT_CON
                 `📸 **Instruction:** Once IMPS transfer is complete, please upload your **Payment Screenshot** in this ticket channel.`
             );
     } else if (method === 'CDM') {
-        const bankName = config.cdmBank || 'State Bank of India';
-        const accNum = config.cdmAccountNum || config.cdmAccount || '45396667547';
-        const holderName = config.cdmName || 'Nehul Gupta';
-        const ifsc = config.cdmIfsc || 'SBIN0001679';
+        const bankName = config.cdmBank || 'SBI';
+        const accNum = config.cdmAccountNum || config.cdmAccount || '45729299372';
+        const holderName = config.cdmName || 'Amit Ashok Salian';
+        const ifsc = config.cdmIfsc || 'SBIN0002271';
 
         embed.setTitle('🏧 Official CDM Cash Deposit Details')
             .setDescription(
